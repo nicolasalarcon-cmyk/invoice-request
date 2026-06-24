@@ -1,0 +1,44 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules
+
+# Build output
+dist
+dist-ssr
+
+# TanStack / Vite / Nitro internals
+.output
+.vinxi
+.tanstack/**
+.nitro
+
+# Wrangler / Cloudflare
+.wrangler/
+.dev.vars
+
+# Environment variables — NEVER commit these
+.env
+.env.*
+env
+
+# Lovable platform metadata
+.lovable/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

@@ -1,0 +1,1 @@
+ALTER TABLE public.invoice_template ADD COLUMN IF NOT EXISTS layout jsonb;
