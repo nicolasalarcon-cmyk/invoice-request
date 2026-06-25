@@ -6,6 +6,7 @@ export interface Programa {
   nemonico: string | null;
   tipo_programa: string | null;
   codigo_snies: string | null;
+  duracion: string | null;
 }
 
 export async function listProgramas(): Promise<Programa[]> {

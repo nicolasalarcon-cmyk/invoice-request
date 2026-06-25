@@ -14,7 +14,7 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { listProgramas, type Programa } from "@/lib/programas";
 
 const EMPTY: Omit<Programa, "id"> = {
-  nombre: "", nemonico: "", tipo_programa: "Diplomado", codigo_snies: "",
+  nombre: "", nemonico: "", tipo_programa: "Diplomado", codigo_snies: "", duracion: "",
 };
 
 export default function ProgramasPage() {
@@ -38,10 +38,11 @@ export default function ProgramasPage() {
       nemonico: editing.nemonico || null,
       tipo_programa: editing.tipo_programa || null,
       codigo_snies: editing.codigo_snies || null,
+      duracion: (editing as any).duracion || null,
     };
     const { error } = editing.id
-      ? await supabase.from("programas").update(payload).eq("id", editing.id)
-      : await supabase.from("programas").insert(payload);
+      ? await supabase.from("programas").update(payload as any).eq("id", editing.id)
+      : await supabase.from("programas").insert(payload as any);
     setBusy(false);
     if (error) return toast.error(error.message);
     toast.success("Programa guardado");
@@ -86,7 +87,7 @@ export default function ProgramasPage() {
                 <td className="px-3 py-2 font-medium">{p.nombre}</td>
                 <td className="px-3 py-2 text-xs text-muted-foreground">{p.codigo_snies ?? "—"}</td>
                 <td className="px-3 py-2">{p.tipo_programa ?? "—"}</td>
-                <td className="px-3 py-2">—</td>
+                <td className="px-3 py-2">{p.duracion ?? "—"}</td>
                 <td className="px-3 py-2 text-right">
                   <Button size="sm" variant="ghost" onClick={() => setEditing(p)}><Pencil className="h-4 w-4" /></Button>
                   <Button size="sm" variant="ghost" onClick={() => remove(p)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
@@ -112,6 +113,9 @@ export default function ProgramasPage() {
               <FieldRow label="Tipo"><Input value={editing.tipo_programa ?? ""} onChange={(e) => setEditing({ ...editing, tipo_programa: e.target.value })} placeholder="Diplomado / Especialización" /></FieldRow>
               <div className="sm:col-span-2">
                 <FieldRow label="SNIES"><Input value={editing.codigo_snies ?? ""} onChange={(e) => setEditing({ ...editing, codigo_snies: e.target.value })} placeholder="Ej: Administración de Empresas Código SNIES 108572" /></FieldRow>
+              </div>
+              <div className="sm:col-span-2">
+                <FieldRow label="Duración"><Input value={editing.duracion ?? ""} onChange={(e) => setEditing({ ...editing, duracion: e.target.value })} placeholder="Ej: 17 semanas" /></FieldRow>
               </div>
             </div>
           )}
