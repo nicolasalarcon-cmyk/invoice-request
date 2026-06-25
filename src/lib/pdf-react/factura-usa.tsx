@@ -3,9 +3,10 @@ import { Document, Page, View, Text, Image, Font, StyleSheet } from "@react-pdf/
 import type { InvoiceData } from "../generate-invoice-pdf";
 import type { InvoiceTemplate } from "../invoice-template";
 import { formatDate } from "../format";
-import regularUrl from "@/assets/fonts/Arial-Regular.ttf?url";
-import boldUrl from "@/assets/fonts/Arial-Bold.ttf?url";
-import logoUrl from "@/assets/logo-cataluna.png";
+import regularUrl from "@/assets/fonts/Arial-Regular.ttf";
+import boldUrl from "@/assets/fonts/Arial-Bold.ttf";
+import _logoMod from "@/assets/logo-cataluna.png";
+const logoUrl: string = typeof _logoMod === "string" ? _logoMod : (_logoMod as { src: string }).src;
 
 // Font registration is de-duped by react-pdf (no-op if already registered)
 Font.register({

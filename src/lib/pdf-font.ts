@@ -1,6 +1,6 @@
 import type { jsPDF } from "jspdf";
-import regularUrl from "@/assets/fonts/Arial-Regular.ttf?url";
-import boldUrl from "@/assets/fonts/Arial-Bold.ttf?url";
+import regularUrl from "@/assets/fonts/Arial-Regular.ttf";
+import boldUrl from "@/assets/fonts/Arial-Bold.ttf";
 
 // Fuente incrustada para los PDF.
 // Las fuentes estándar de jsPDF (Helvetica) NO soportan Unicode: al encontrar

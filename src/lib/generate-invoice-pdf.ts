@@ -42,7 +42,8 @@ async function buildDocument(
     ? React.createElement(FacturaUSADocument, { data, _tpl: tpl })
     : React.createElement(OrdenMatriculaDocument, { data, tpl });
 
-  return pdf(element);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return pdf(element as any);
 }
 
 /** Returns a base64 string (no data: prefix) for emailing. */
@@ -117,7 +118,8 @@ export async function buildInvoiceDoc(
     fixMojibake,
   } = await import("./invoice-layout");
   const logoMod = await import("@/assets/logo-cataluna.png");
-  const logoUrl: string = logoMod.default;
+  const logoRaw = logoMod.default;
+  const logoUrl: string = typeof logoRaw === "string" ? logoRaw : (logoRaw as { src: string }).src;
 
   const tpl =
     tplOverride ??
