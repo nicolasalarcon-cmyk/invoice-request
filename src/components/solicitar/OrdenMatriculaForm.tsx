@@ -142,7 +142,7 @@ export function OrdenMatriculaForm({ editId }: { editId?: string }) {
       plan_estudio: p.nombre,
       fecha_inicio: "",
       fecha_fin: "",
-      duracion: isEsp ? "3 cuatrimestres" : "",
+      duracion: (p as any).duracion ?? (isEsp ? "3 cuatrimestres" : ""),
       convocatoria: "",
     }));
     setOpenProg(false);
