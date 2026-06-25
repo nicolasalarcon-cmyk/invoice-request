@@ -128,11 +128,12 @@ export default function AdminPanel() {
     return () => { supabase.removeChannel(channel); };
   }, [isAdmin]);
 
-  const tipos = useMemo(() => {
-    const s = new Set<string>();
-    items.forEach((i) => i.tipo_programa && s.add(i.tipo_programa));
-    return [...s];
-  }, [items]);
+  const tipos: { value: string; label: string }[] = [
+    { value: "orden_matricula", label: "Orden de Matrícula" },
+    { value: "factura_usa",     label: "Factura USA" },
+    { value: "factura_colombia", label: "Factura Colombia" },
+    { value: "factura_paypal",  label: "Factura Paypal" },
+  ];
 
   const cedAlerts = useMemo(() => {
     const byCed = new Map<string, Req[]>();
@@ -153,7 +154,7 @@ export default function AdminPanel() {
     const fromTs = dateFrom ? new Date(dateFrom).getTime() : 0;
     return items.filter((r) => {
       if (statusFilter !== "all" && r.status !== statusFilter) return false;
-      if (tipoFilter !== "all" && r.tipo_programa !== tipoFilter) return false;
+      if (tipoFilter !== "all" && r.document_type !== tipoFilter) return false;
       if (fromTs && new Date(r.created_at).getTime() < fromTs) return false;
       if (!s) return true;
       return (
@@ -405,7 +406,7 @@ export default function AdminPanel() {
           <SelectTrigger className="w-44"><SelectValue placeholder="Tipo" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos los tipos</SelectItem>
-            {tipos.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            {tipos.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
           </SelectContent>
         </Select>
         <div className="flex items-center gap-1">
