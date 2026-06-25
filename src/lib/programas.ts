@@ -15,5 +15,5 @@ export async function listProgramas(): Promise<Programa[]> {
     .select("*")
     .order("nombre");
   if (error) throw error;
-  return (data ?? []) as Programa[];
+  return (data ?? []) as unknown as Programa[];
 }
