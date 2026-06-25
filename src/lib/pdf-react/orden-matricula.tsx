@@ -3,8 +3,8 @@ import { Document, Page, View, Text, Font, StyleSheet } from "@react-pdf/rendere
 import type { InvoiceData } from "../generate-invoice-pdf";
 import type { InvoiceTemplate } from "../invoice-template";
 import { formatDate } from "../format";
-import regularUrl from "@/assets/fonts/Arial-Regular.ttf?url";
-import boldUrl from "@/assets/fonts/Arial-Bold.ttf?url";
+import regularUrl from "@/assets/fonts/Arial-Regular.ttf";
+import boldUrl from "@/assets/fonts/Arial-Bold.ttf";
 
 // ─── Font registration (runs once at module load) ─────────────────────────────
 Font.register({

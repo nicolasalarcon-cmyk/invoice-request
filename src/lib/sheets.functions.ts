@@ -8,15 +8,17 @@ export interface CohorteRow {
 }
 
 export async function listCohortesByNemonico(nemonico: string): Promise<CohorteRow[]> {
-  const { data, error } = await supabase
-    .from("cohortes")
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const q = (supabase as any).from("cohortes")
     .select("programa_cohorte, fecha_inicio, fecha_finalizacion, convocatoria")
     .ilike("programa_cohorte", `${nemonico.trim().toUpperCase()}%`)
     .order("programa_cohorte");
+  const { data, error } = await q;
 
   if (error) throw error;
 
-  return (data ?? []).map((r) => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data ?? []).map((r: any) => ({
     codigo: r.programa_cohorte,
     fecha_inicio: r.fecha_inicio ?? "",
     fecha_finalizacion: r.fecha_finalizacion ?? null,

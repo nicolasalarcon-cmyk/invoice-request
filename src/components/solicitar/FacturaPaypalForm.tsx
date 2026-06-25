@@ -1,4 +1,4 @@
-import { useNavigate } from "@tanstack/react-router";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -13,7 +13,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { notifyAdminsNewRequest } from "@/lib/email.functions";
 import { AttachmentsField, type AttachmentItem } from "./AttachmentsField";
 import { listProgramas, type Programa } from "@/lib/programas";
 import { listCohortesByNemonico, type CohorteRow } from "@/lib/sheets.functions";
@@ -39,7 +38,7 @@ const EMPTY: PpForm = {
 
 export function FacturaPaypalForm({ editId }: { editId?: string }) {
   const { user, isAdmin, isComercial, profile } = useAuth();
-  const navigate = useNavigate();
+  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState<PpForm>(EMPTY);
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
@@ -151,14 +150,9 @@ export function FacturaPaypalForm({ editId }: { editId?: string }) {
           status: "pendiente",
         });
         if (error) throw error;
-        notifyAdminsNewRequest({ data: {
-          nombre: payload.nombre, identificacion: payload.identificacion,
-          programa: payload.programa, valor_total: payload.valor_total,
-          comercial_nombre: profile?.nombre_completo ?? null,
-        } }).catch((e) => console.warn("notify admins failed", e));
         toast.success("Solicitud enviada");
       }
-      navigate({ to: isAdmin ? "/admin" : "/mis-recibos" });
+      router.push(isAdmin ? "/admin" : "/mis-recibos");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "No se pudo guardar");
     } finally {

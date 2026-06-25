@@ -1,4 +1,4 @@
-import { useNavigate } from "@tanstack/react-router";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -20,7 +20,6 @@ import { listProgramas, type Programa } from "@/lib/programas";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { listCohortesByNemonico, type CohorteRow } from "@/lib/sheets.functions";
-import { notifyAdminsNewRequest } from "@/lib/email.functions";
 
 const CONCEPTOS_FIJOS = ["Matrícula", "Matrícula Parcial", "Otro"] as const;
 
@@ -76,7 +75,7 @@ function deriveSemestre(fecha: string): string {
 
 export function OrdenMatriculaForm({ editId }: { editId?: string }) {
   const { user, isAdmin, isComercial, profile } = useAuth();
-  const navigate = useNavigate();
+  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [autoApprove, setAutoApprove] = useState(false);
   const [cfg, setCfg] = useState<FormConfig | null>(null);
@@ -143,7 +142,7 @@ export function OrdenMatriculaForm({ editId }: { editId?: string }) {
       plan_estudio: p.nombre,
       fecha_inicio: "",
       fecha_fin: "",
-      duracion: p.duracion ?? (isEsp ? "3 cuatrimestres" : ""),
+      duracion: isEsp ? "3 cuatrimestres" : "",
       convocatoria: "",
     }));
     setOpenProg(false);
@@ -241,7 +240,7 @@ export function OrdenMatriculaForm({ editId }: { editId?: string }) {
         const { error } = await supabase.from("invoice_requests").update(next).eq("id", editId);
         if (error) throw error;
         toast.success("Solicitud actualizada");
-        navigate({ to: isAdmin ? "/admin" : "/mis-recibos" });
+        router.push(isAdmin ? "/admin" : "/mis-recibos");
       } else {
         const { error } = await supabase.from("invoice_requests").insert({
           ...payload,
@@ -255,15 +254,8 @@ export function OrdenMatriculaForm({ editId }: { editId?: string }) {
           recibo_numero: approveNow ? Date.now() % 100000000 : null,
         });
         if (error) throw error;
-        if (!approveNow) {
-          notifyAdminsNewRequest({ data: {
-            nombre: payload.nombre, identificacion: payload.identificacion,
-            programa: payload.programa, valor_total: payload.valor_total,
-            comercial_nombre: profile?.nombre_completo ?? null,
-          } }).catch((e) => console.warn("notify admins failed", e));
-        }
         toast.success(approveNow ? "Recibo creado y aprobado" : "Solicitud enviada");
-        navigate({ to: approveNow ? "/admin" : isAdmin ? "/admin" : "/mis-recibos" });
+        router.push(approveNow ? "/admin" : isAdmin ? "/admin" : "/mis-recibos");
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "No se pudo guardar");
