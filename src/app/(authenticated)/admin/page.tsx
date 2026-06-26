@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { formatCOP, formatDate } from "@/lib/format";
 import {
   AlertTriangle, CheckCircle2, XCircle, FileDown, Inbox, Search, Pencil,
-  FileText, Trash2, Eye, RotateCcw, BookOpen,
+  FileText, Trash2, Eye, Copy, BookOpen,
 } from "lucide-react";
 import { listTemplates, type InvoiceTemplate } from "@/lib/invoice-template";
 
@@ -290,26 +290,8 @@ export default function AdminPanel() {
     load();
   };
 
-  const relanzar = async (r: Req) => {
-    if (!confirm(`¿Relanzar la factura de ${r.nombre}?`)) return;
-    const user = (await supabase.auth.getUser()).data.user;
-    const { data, error } = await supabase.from("invoice_requests").insert({
-      nombre: r.nombre, identificacion: r.identificacion, email: r.email,
-      codigo_estudiante: r.codigo_estudiante, programa: r.programa,
-      codigo_snies: r.codigo_snies, periodo: r.periodo, cohorte: r.cohorte,
-      plan_estudio: r.plan_estudio, tipo_programa: r.tipo_programa,
-      fecha_inicio: r.fecha_inicio, fecha_fin: r.fecha_fin,
-      horas_programa: r.horas_programa, duracion: r.duracion,
-      convocatoria: r.convocatoria, concepto: r.concepto, observaciones: r.observaciones,
-      matricula: r.matricula, descuento: r.descuento, descuento_pct: r.descuento_pct,
-      descuento_bono: r.descuento_bono ?? 0, valor_total: r.valor_total,
-      recargo_total: r.recargo_total, template_id: r.template_id,
-      comercial_nombre: r.comercial_nombre, comercial_email: r.comercial_email,
-      created_by: user?.id ?? null, parent_id: r.id, status: "pendiente",
-    }).select("id").single();
-    if (error) return toast.error(error.message);
-    toast.success("Factura relanzada — edítala y vuelve a aprobar");
-    window.location.href = `/solicitar?id=${data.id}`;
+  const duplicar = (r: Req) => {
+    window.location.href = `/solicitar?duplicar=${r.id}`;
   };
 
   const downloadPdf = async (r: Req) => {
@@ -500,8 +482,8 @@ export default function AdminPanel() {
                         <Button size="sm" onClick={() => downloadPdf(r)}>
                           <FileDown className="mr-2 h-4 w-4" /> Descargar PDF
                         </Button>
-                        <Button size="sm" variant="secondary" onClick={() => relanzar(r)}>
-                          <RotateCcw className="mr-2 h-4 w-4" /> Relanzar
+                        <Button size="sm" variant="secondary" onClick={() => duplicar(r)}>
+                          <Copy className="mr-2 h-4 w-4" /> Duplicar
                         </Button>
                       </>
                     )}

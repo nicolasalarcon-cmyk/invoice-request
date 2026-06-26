@@ -28,27 +28,29 @@ function SolicitarInner() {
   const { user, isAdmin, isComercial, loading } = useAuth();
   const searchParams = useSearchParams();
   const editId = searchParams.get("id") ?? undefined;
+  const duplicateFromId = searchParams.get("duplicar") ?? undefined;
   const tipoSearch = searchParams.get("tipo") ?? undefined;
 
   const [docType, setDocType] = useState<DocType>(
     (tipoSearch as DocType) ?? "orden_matricula",
   );
-  const [loadingEdit, setLoadingEdit] = useState(!!editId);
+  const [loadingEdit, setLoadingEdit] = useState(!!(editId || duplicateFromId));
 
   useEffect(() => {
-    if (!editId || !user) return;
+    const sourceId = editId || duplicateFromId;
+    if (!sourceId || !user) return;
     setLoadingEdit(true);
     supabase
       .from("invoice_requests")
       .select("document_type")
-      .eq("id", editId)
+      .eq("id", sourceId)
       .maybeSingle()
       .then(({ data }) => {
         const dt = (data as { document_type?: string } | null)?.document_type as DocType | undefined;
         if (dt) setDocType(dt);
         setLoadingEdit(false);
       });
-  }, [editId, user]);
+  }, [editId, duplicateFromId, user]);
 
   if (loading) {
     return <main className="mx-auto max-w-4xl px-6 py-8 text-sm text-muted-foreground">Cargando…</main>;
@@ -71,15 +73,17 @@ function SolicitarInner() {
   return (
     <main className="mx-auto max-w-4xl px-6 py-8">
       <h1 className="text-2xl font-bold tracking-tight text-foreground">
-        {editId ? `Editar · ${titleByType[docType]}` : "Crear"}
+        {editId ? `Editar · ${titleByType[docType]}` : duplicateFromId ? `Duplicar · ${titleByType[docType]}` : "Crear"}
       </h1>
       <p className="mt-1 text-sm text-muted-foreground">
         {editId
           ? "Modifica los datos de esta solicitud."
+          : duplicateFromId
+          ? "Revisa y ajusta los datos. Al guardar se creará una nueva solicitud."
           : "Selecciona el tipo de documento a crear. El formulario aparecerá debajo."}
       </p>
 
-      {!editId && (
+      {!editId && !duplicateFromId && (
         <div className="mt-6 flex flex-wrap gap-2">
           {OPTIONS.map((opt) => {
             const Icon = opt.icon;
@@ -107,13 +111,13 @@ function SolicitarInner() {
         {loadingEdit ? (
           <p className="text-sm text-muted-foreground">Cargando solicitud…</p>
         ) : docType === "orden_matricula" ? (
-          <OrdenMatriculaForm editId={editId} />
+          <OrdenMatriculaForm editId={editId} duplicateFromId={duplicateFromId} />
         ) : docType === "factura_usa" ? (
-          <FacturaUsaForm editId={editId} />
+          <FacturaUsaForm editId={editId} duplicateFromId={duplicateFromId} />
         ) : docType === "factura_colombia" ? (
-          <FacturaColombiaForm editId={editId} />
+          <FacturaColombiaForm editId={editId} duplicateFromId={duplicateFromId} />
         ) : (
-          <FacturaPaypalForm editId={editId} />
+          <FacturaPaypalForm editId={editId} duplicateFromId={duplicateFromId} />
         )}
       </div>
     </main>

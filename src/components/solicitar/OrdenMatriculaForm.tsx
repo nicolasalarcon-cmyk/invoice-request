@@ -75,7 +75,7 @@ function deriveSemestre(fecha: string): string {
   return `${label} ${d.getFullYear()}`;
 }
 
-export function OrdenMatriculaForm({ editId }: { editId?: string }) {
+export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: string; duplicateFromId?: string }) {
   const { user, isAdmin, isComercial, profile } = useAuth();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -95,44 +95,51 @@ export function OrdenMatriculaForm({ editId }: { editId?: string }) {
     listProgramas().then(setProgramas).catch(() => setProgramas([]));
   }, []);
 
+  const loadFormData = async (sourceId: string, isEdit: boolean) => {
+    const { data, error } = await supabase.from("invoice_requests").select("*").eq("id", sourceId).maybeSingle();
+    if (error || !data) return;
+    if (isEdit) setOriginalStatus(data.status);
+    const d = data as Record<string, unknown>;
+    const att = (d.attachments as AttachmentItem[] | null) ?? [];
+    setAttachments(Array.isArray(att) ? att : []);
+    const conceptoRaw = data.concepto ?? "Matrícula";
+    const isFijo = (CONCEPTOS_FIJOS as readonly string[]).includes(conceptoRaw);
+    setForm({
+      nombre: data.nombre ?? "",
+      identificacion: data.identificacion ?? "",
+      email: data.email ?? "",
+      tipo_financiacion: (d.tipo_persona as string) ?? "",
+      tipo_programa: data.tipo_programa ?? "Diplomado",
+      programa: data.programa ?? "",
+      programa_nemonico: "",
+      codigo_snies: data.codigo_snies ?? "",
+      cohorte: data.cohorte ?? "",
+      plan_estudio: data.plan_estudio ?? "",
+      fecha_inicio: data.fecha_inicio ?? "",
+      fecha_fin: data.fecha_fin ?? "",
+      horas_programa: data.horas_programa ? String(data.horas_programa) : "",
+      duracion: (data as { duracion?: string | null }).duracion ?? "",
+      convocatoria: (data as { convocatoria?: string | null }).convocatoria ?? "",
+      periodo: data.periodo ?? "",
+      concepto_opcion: isFijo ? conceptoRaw : "Otro",
+      concepto_otro: isFijo ? "" : conceptoRaw,
+      valor: String(data.matricula ?? ""),
+      descuento_pct: String(data.descuento_pct ?? 0),
+      descuento_bono: String(data.descuento_bono ?? 0),
+      fecha_limite_pago: data.fecha_limite_pago ?? "",
+      observaciones: data.observaciones ?? "",
+    });
+  };
+
   useEffect(() => {
     if (!editId || !user) return;
-    (async () => {
-      const { data, error } = await supabase.from("invoice_requests").select("*").eq("id", editId).maybeSingle();
-      if (error || !data) return;
-      setOriginalStatus(data.status);
-      const d = data as Record<string, unknown>;
-      const att = (d.attachments as AttachmentItem[] | null) ?? [];
-      setAttachments(Array.isArray(att) ? att : []);
-      const conceptoRaw = data.concepto ?? "Matrícula";
-      const isFijo = (CONCEPTOS_FIJOS as readonly string[]).includes(conceptoRaw);
-      setForm({
-        nombre: data.nombre ?? "",
-        identificacion: data.identificacion ?? "",
-        email: data.email ?? "",
-        tipo_financiacion: (d.tipo_persona as string) ?? "",
-        tipo_programa: data.tipo_programa ?? "Diplomado",
-        programa: data.programa ?? "",
-        programa_nemonico: "",
-        codigo_snies: data.codigo_snies ?? "",
-        cohorte: data.cohorte ?? "",
-        plan_estudio: data.plan_estudio ?? "",
-        fecha_inicio: data.fecha_inicio ?? "",
-        fecha_fin: data.fecha_fin ?? "",
-        horas_programa: data.horas_programa ? String(data.horas_programa) : "",
-        duracion: (data as { duracion?: string | null }).duracion ?? "",
-        convocatoria: (data as { convocatoria?: string | null }).convocatoria ?? "",
-        periodo: data.periodo ?? "",
-        concepto_opcion: isFijo ? conceptoRaw : "Otro",
-        concepto_otro: isFijo ? "" : conceptoRaw,
-        valor: String(data.matricula ?? ""),
-        descuento_pct: String(data.descuento_pct ?? 0),
-        descuento_bono: String(data.descuento_bono ?? 0),
-        fecha_limite_pago: data.fecha_limite_pago ?? "",
-        observaciones: data.observaciones ?? "",
-      });
-    })();
-  }, [editId, user]);
+    loadFormData(editId, true);
+  }, [editId, user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!duplicateFromId || !user) return;
+    loadFormData(duplicateFromId, false);
+  }, [duplicateFromId, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const update = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -505,7 +512,7 @@ export function OrdenMatriculaForm({ editId }: { editId?: string }) {
           </label>
         )}
         <Button type="submit" size="lg" disabled={busy || (!isComercial && !isAdmin)}>
-          {busy ? "Guardando..." : editId ? "Guardar cambios" : isAdmin && autoApprove ? "Crear recibo aprobado" : "Enviar solicitud"}
+          {busy ? "Guardando..." : editId ? "Guardar cambios" : duplicateFromId ? "Duplicar" : isAdmin && autoApprove ? "Crear recibo aprobado" : "Enviar solicitud"}
         </Button>
       </div>
     </form>

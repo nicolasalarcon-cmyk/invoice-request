@@ -64,7 +64,7 @@ const EMPTY: PpForm = {
   valor: "", fecha_limite_pago: "",
 };
 
-export function FacturaPaypalForm({ editId }: { editId?: string }) {
+export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string; duplicateFromId?: string }) {
   const { user, isAdmin, isComercial, profile } = useAuth();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -82,43 +82,50 @@ export function FacturaPaypalForm({ editId }: { editId?: string }) {
     listProgramas().then(setProgramas).catch(() => setProgramas([]));
   }, []);
 
+  const loadFormData = async (sourceId: string, isEdit: boolean) => {
+    const { data, error } = await supabase.from("invoice_requests").select("*").eq("id", sourceId).maybeSingle();
+    if (error || !data) return;
+    const d = data as Record<string, unknown>;
+    if (isEdit) setOriginalStatus(data.status);
+    const att = (d.attachments as AttachmentItem[] | null) ?? [];
+    setAttachments(Array.isArray(att) ? att : []);
+    const parts = (d.participantes as Participant[] | null) ?? [];
+    setParticipants(Array.isArray(parts) ? parts : []);
+    const tipoPersona = (d.tipo_persona as TipoPersona) || "Persona Natural";
+    const isNatural = tipoPersona === "Persona Natural";
+    setForm({
+      tipo_persona: tipoPersona,
+      nombre: isNatural ? (data.nombre ?? "") : "",
+      cedula: isNatural ? (data.identificacion ?? "") : "",
+      email_natural: isNatural ? (data.email ?? "") : "",
+      telefono_natural: isNatural ? ((d.telefono as string) ?? "") : "",
+      empresa: !isNatural ? (data.nombre ?? "") : "",
+      nit: !isNatural ? (data.identificacion ?? "") : "",
+      email_empresa: !isNatural ? (data.email ?? "") : "",
+      pais: (d.pais as string) ?? "",
+      direccion: (d.direccion as string) ?? "",
+      ciudad: (d.ciudad as string) ?? "",
+      telefono: !isNatural ? ((d.telefono as string) ?? "") : "",
+      numero_participantes: d.numero_participantes != null ? String(d.numero_participantes) : "",
+      programa: data.programa ?? "",
+      nemonico: (d.nemonico as string) ?? "",
+      cohorte: data.cohorte ?? "",
+      numero_inscripcion: (d.numero_inscripcion as string) ?? "",
+      fecha_inicio: data.fecha_inicio ?? "",
+      valor: String(data.valor_total ?? ""),
+      fecha_limite_pago: data.fecha_limite_pago ?? "",
+    });
+  };
+
   useEffect(() => {
     if (!editId || !user) return;
-    (async () => {
-      const { data, error } = await supabase.from("invoice_requests").select("*").eq("id", editId).maybeSingle();
-      if (error || !data) return;
-      const d = data as Record<string, unknown>;
-      setOriginalStatus(data.status);
-      const att = (d.attachments as AttachmentItem[] | null) ?? [];
-      setAttachments(Array.isArray(att) ? att : []);
-      const parts = (d.participantes as Participant[] | null) ?? [];
-      setParticipants(Array.isArray(parts) ? parts : []);
-      const tipoPersona = (d.tipo_persona as TipoPersona) || "Persona Natural";
-      const isNatural = tipoPersona === "Persona Natural";
-      setForm({
-        tipo_persona: tipoPersona,
-        nombre: isNatural ? (data.nombre ?? "") : "",
-        cedula: isNatural ? (data.identificacion ?? "") : "",
-        email_natural: isNatural ? (data.email ?? "") : "",
-        telefono_natural: isNatural ? ((d.telefono as string) ?? "") : "",
-        empresa: !isNatural ? (data.nombre ?? "") : "",
-        nit: !isNatural ? (data.identificacion ?? "") : "",
-        email_empresa: !isNatural ? (data.email ?? "") : "",
-        pais: (d.pais as string) ?? "",
-        direccion: (d.direccion as string) ?? "",
-        ciudad: (d.ciudad as string) ?? "",
-        telefono: !isNatural ? ((d.telefono as string) ?? "") : "",
-        numero_participantes: d.numero_participantes != null ? String(d.numero_participantes) : "",
-        programa: data.programa ?? "",
-        nemonico: (d.nemonico as string) ?? "",
-        cohorte: data.cohorte ?? "",
-        numero_inscripcion: (d.numero_inscripcion as string) ?? "",
-        fecha_inicio: data.fecha_inicio ?? "",
-        valor: String(data.valor_total ?? ""),
-        fecha_limite_pago: data.fecha_limite_pago ?? "",
-      });
-    })();
-  }, [editId, user]);
+    loadFormData(editId, true);
+  }, [editId, user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!duplicateFromId || !user) return;
+    loadFormData(duplicateFromId, false);
+  }, [duplicateFromId, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync participants array length with numero_participantes
   useEffect(() => {
@@ -461,7 +468,7 @@ export function FacturaPaypalForm({ editId }: { editId?: string }) {
 
       <div className="flex justify-end">
         <Button type="submit" size="lg" disabled={busy || (!isComercial && !isAdmin) || !form.tipo_persona}>
-          {busy ? "Guardando..." : editId ? "Guardar cambios" : "Enviar solicitud"}
+          {busy ? "Guardando..." : editId ? "Guardar cambios" : duplicateFromId ? "Duplicar" : "Enviar solicitud"}
         </Button>
       </div>
     </form>
