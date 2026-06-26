@@ -123,6 +123,7 @@ export type Database = {
           numero_participantes: number | null
           observaciones: string | null
           pais: string | null
+          participantes: Json
           parent_id: string | null
           periodo: string
           plan_estudio: string | null
@@ -181,6 +182,7 @@ export type Database = {
           numero_participantes?: number | null
           observaciones?: string | null
           pais?: string | null
+          participantes?: Json
           parent_id?: string | null
           periodo?: string
           plan_estudio?: string | null
@@ -239,6 +241,7 @@ export type Database = {
           numero_participantes?: number | null
           observaciones?: string | null
           pais?: string | null
+          participantes?: Json
           parent_id?: string | null
           periodo?: string
           plan_estudio?: string | null
