@@ -208,7 +208,7 @@ export default function Dashboard() {
         </div>
 
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold text-muted-foreground">Tipo factura:</span>
+          <span className="text-xs font-semibold text-muted-foreground">Tipo de solicitud:</span>
           {DOC_TYPES.map((dt) => {
             const m = DOC_META[dt];
             const active = docSel.includes(dt);
@@ -275,7 +275,7 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="Por tipo de factura" subtitle="Distribución por documento">
+        <ChartCard title="Por tipo de solicitud" subtitle="Distribución por documento">
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={byDocType} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <defs>
@@ -314,7 +314,7 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="Top comerciales" subtitle="Por número de solicitudes">
+        <ChartCard title="Ranking" subtitle="Por número de solicitudes">
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={byComercial} layout="vertical" margin={{ top: 5, right: 16, left: 8, bottom: 5 }}>
               <defs>
