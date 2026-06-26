@@ -12,7 +12,25 @@ export interface AttachmentItem {
   [key: string]: string | number;
 }
 
-const ACCEPT = ".pdf,.jpg,.jpeg,.png,.doc,.docx,application/pdf,image/jpeg,image/png,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const ACCEPT = [
+  ".pdf,.jpg,.jpeg,.png,.gif,.webp,.bmp",
+  ".doc,.docx,.xls,.xlsx,.ppt,.pptx",
+  ".zip,.rar,.7z,.tar,.gz,.tar.gz",
+  "application/pdf",
+  "image/*",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/zip",
+  "application/x-rar-compressed",
+  "application/vnd.rar",
+  "application/x-7z-compressed",
+  "application/x-tar",
+  "application/gzip",
+].join(",");
 
 export function AttachmentsField({
   value,
@@ -79,7 +97,7 @@ export function AttachmentsField({
         {uploading ? "Subiendo…" : "Adjuntar archivos"}
       </Button>
       <p className="text-xs text-muted-foreground">
-        PDF, imágenes (JPG/PNG) o Word (DOC/DOCX). Puedes subir varios.
+        PDF, imágenes, Word, Excel, PowerPoint, archivos comprimidos (ZIP, RAR, 7Z). Puedes subir varios.
       </p>
       {value.length > 0 && (
         <ul className="mt-2 divide-y divide-border rounded-md border border-border bg-card">

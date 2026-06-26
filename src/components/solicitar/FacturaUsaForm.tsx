@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { formatCOP } from "@/lib/format";
 import { listProgramas, type Programa } from "@/lib/programas";
 import { listCohortesByNemonico, type CohorteRow } from "@/lib/sheets.functions";
+import { AttachmentsField, type AttachmentItem } from "./AttachmentsField";
 
 interface UsaForm {
   empresa: string;
@@ -51,6 +52,7 @@ export function FacturaUsaForm({ editId }: { editId?: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState<UsaForm>(EMPTY);
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [originalStatus, setOriginalStatus] = useState<string | null>(null);
   const [programas, setProgramas] = useState<Programa[]>([]);
   const [openProg, setOpenProg] = useState(false);
@@ -68,6 +70,9 @@ export function FacturaUsaForm({ editId }: { editId?: string }) {
       const { data, error } = await supabase.from("invoice_requests").select("*").eq("id", editId).maybeSingle();
       if (error || !data) return;
       setOriginalStatus(data.status);
+      const d = data as Record<string, unknown>;
+      const att = (d.attachments as AttachmentItem[] | null) ?? [];
+      setAttachments(Array.isArray(att) ? att : []);
       setForm({
         empresa: (data as { empresa?: string | null }).empresa ?? "",
         nit: (data as { nit?: string | null }).nit ?? "",
@@ -166,6 +171,7 @@ export function FacturaUsaForm({ editId }: { editId?: string }) {
         recargo_total: Math.round(computedTotal * 1.1),
         fecha_limite_pago: baseLimite,
         observaciones: form.observaciones || null,
+        attachments,
       };
 
       if (editId) {
@@ -360,6 +366,12 @@ export function FacturaUsaForm({ editId }: { editId?: string }) {
             <Input required type="date" value={form.fecha_limite_pago} onChange={(e) => update("fecha_limite_pago", e.target.value)} />
           </Field>
         </div>
+      </Section>
+
+      <Section title="Adjuntos">
+        {user && (
+          <AttachmentsField value={attachments} onChange={setAttachments} userId={user.id} disabled={busy} />
+        )}
       </Section>
 
       <Section title="Observaciones">

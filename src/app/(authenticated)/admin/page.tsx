@@ -348,6 +348,7 @@ export default function AdminPanel() {
       empresa: x.empresa ?? null, cliente_nit: x.nit ?? null, direccion: x.direccion ?? null,
       ciudad: x.ciudad ?? null, telefono: x.telefono ?? null, pais: x.pais ?? null,
       email: r.email, nemonico: x.nemonico ?? null, observaciones: r.observaciones,
+      concepto: r.concepto,
     };
   };
 

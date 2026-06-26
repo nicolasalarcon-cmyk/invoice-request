@@ -20,6 +20,7 @@ import { listProgramas, type Programa } from "@/lib/programas";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { listCohortesByNemonico, type CohorteRow } from "@/lib/sheets.functions";
+import { AttachmentsField, type AttachmentItem } from "./AttachmentsField";
 
 const CONCEPTOS_FIJOS = ["Matrícula", "Matrícula Parcial", "Otro"] as const;
 
@@ -27,6 +28,7 @@ interface FormState {
   nombre: string;
   identificacion: string;
   email: string;
+  tipo_financiacion: string;
   tipo_programa: string;
   programa: string;
   programa_nemonico: string;
@@ -49,7 +51,7 @@ interface FormState {
 }
 
 const EMPTY: FormState = {
-  nombre: "", identificacion: "", email: "",
+  nombre: "", identificacion: "", email: "", tipo_financiacion: "",
   tipo_programa: "Diplomado", programa: "", programa_nemonico: "",
   codigo_snies: "", cohorte: "", plan_estudio: "",
   fecha_inicio: "", fecha_fin: "", horas_programa: "",
@@ -80,6 +82,7 @@ export function OrdenMatriculaForm({ editId }: { editId?: string }) {
   const [autoApprove, setAutoApprove] = useState(false);
   const [cfg, setCfg] = useState<FormConfig | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY);
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [originalStatus, setOriginalStatus] = useState<string | null>(null);
   const [programas, setProgramas] = useState<Programa[]>([]);
   const [openProg, setOpenProg] = useState(false);
@@ -98,12 +101,16 @@ export function OrdenMatriculaForm({ editId }: { editId?: string }) {
       const { data, error } = await supabase.from("invoice_requests").select("*").eq("id", editId).maybeSingle();
       if (error || !data) return;
       setOriginalStatus(data.status);
+      const d = data as Record<string, unknown>;
+      const att = (d.attachments as AttachmentItem[] | null) ?? [];
+      setAttachments(Array.isArray(att) ? att : []);
       const conceptoRaw = data.concepto ?? "Matrícula";
       const isFijo = (CONCEPTOS_FIJOS as readonly string[]).includes(conceptoRaw);
       setForm({
         nombre: data.nombre ?? "",
         identificacion: data.identificacion ?? "",
         email: data.email ?? "",
+        tipo_financiacion: (d.tipo_persona as string) ?? "",
         tipo_programa: data.tipo_programa ?? "Diplomado",
         programa: data.programa ?? "",
         programa_nemonico: "",
@@ -224,6 +231,8 @@ export function OrdenMatriculaForm({ editId }: { editId?: string }) {
         recargo_total: Math.round(valorTotal * 1.1),
         fecha_limite_pago: baseLimite,
         observaciones: form.observaciones || null,
+        tipo_persona: form.tipo_financiacion || null,
+        attachments,
       };
 
       if (editId) {
@@ -292,6 +301,16 @@ export function OrdenMatriculaForm({ editId }: { editId?: string }) {
               <Input type="email" maxLength={200} value={form.email} onChange={(e) => update("email", e.target.value)} />
             </Field>
           )}
+          <Field label="Motivo">
+            <Select value={form.tipo_financiacion} onValueChange={(v) => update("tipo_financiacion", v)}>
+              <SelectTrigger><SelectValue placeholder="Selecciona una opción" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Personal">Personal</SelectItem>
+                <SelectItem value="Retiro de las Cesantías">Retiro de las Cesantías</SelectItem>
+                <SelectItem value="Empresa">Empresa</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
         </div>
       </Section>
 
@@ -459,6 +478,12 @@ export function OrdenMatriculaForm({ editId }: { editId?: string }) {
             <Input required type="date" value={form.fecha_limite_pago} onChange={(e) => update("fecha_limite_pago", e.target.value)} />
           </Field>
         </div>
+      </Section>
+
+      <Section title="Adjuntos">
+        {user && (
+          <AttachmentsField value={attachments} onChange={setAttachments} userId={user.id} disabled={busy} />
+        )}
       </Section>
 
       {fieldVisible("observaciones") && (

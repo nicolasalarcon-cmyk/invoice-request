@@ -29,6 +29,12 @@ export async function getFormConfig(): Promise<FormConfig> {
   if (merged.tipos_programa.some((t) => GARBLED.test(t))) {
     merged.tipos_programa = DEFAULT.tipos_programa;
   }
+  // Sanitizar etiquetas de campos con encoding roto
+  for (const key of Object.keys(merged.fields)) {
+    if (GARBLED.test(merged.fields[key].label)) {
+      merged.fields[key].label = DEFAULT.fields[key as keyof typeof DEFAULT.fields]?.label ?? merged.fields[key].label;
+    }
+  }
   cached = merged;
   return cached;
 }
