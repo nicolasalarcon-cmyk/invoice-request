@@ -279,7 +279,7 @@ export function OrdenMatriculaForm({ editId }: { editId?: string }) {
     <form onSubmit={handleSubmit} className="space-y-6">
       <Section title="Datos del comercial">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Nombre completo">
+          <Field label="Nombre Completo">
             <Input value={profile?.nombre_completo ?? ""} disabled />
           </Field>
           <Field label="Correo">
