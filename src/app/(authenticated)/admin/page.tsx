@@ -97,6 +97,7 @@ export default function AdminPanel() {
   const [approving, setApproving] = useState<Req | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
   const [approvalPdf, setApprovalPdf] = useState<File | null>(null);
+  const [manualReciboNumero, setManualReciboNumero] = useState<string>("");
   const [rejecting, setRejecting] = useState<Req | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [previewing, setPreviewing] = useState<Req | null>(null);
@@ -181,6 +182,7 @@ export default function AdminPanel() {
     setApproving(r);
     setApprovalPdf(null);
     if (isUploadFlow(r)) {
+      setManualReciboNumero(r.recibo_numero != null ? String(r.recibo_numero) : "");
       setSelectedTemplate("");
       return;
     }
@@ -190,15 +192,20 @@ export default function AdminPanel() {
   };
 
   const confirmApproveUpload = async () => {
-    if (!approving || !approvalPdf) return;
+    if (!approving) return;
     const r = approving;
     try {
-      const path = `approved/${r.id}.pdf`;
-      const { error: upErr } = await supabase.storage
-        .from("invoice-files")
-        .upload(path, approvalPdf, { contentType: "application/pdf", upsert: true });
-      if (upErr) throw upErr;
-      const reciboNumero = r.recibo_numero ?? Date.now() % 100000000;
+      let pdfPath: string | null = null;
+      if (approvalPdf) {
+        const ext = approvalPdf.name.includes(".") ? approvalPdf.name.split(".").pop() : "bin";
+        const path = `approved/${r.id}.${ext}`;
+        const { error: upErr } = await supabase.storage
+          .from("invoice-files")
+          .upload(path, approvalPdf, { contentType: approvalPdf.type || "application/octet-stream", upsert: true });
+        if (upErr) throw upErr;
+        pdfPath = path;
+      }
+      const reciboNumero = Number(manualReciboNumero);
       const user = (await supabase.auth.getUser()).data.user;
       const { error } = await supabase
         .from("invoice_requests")
@@ -207,13 +214,14 @@ export default function AdminPanel() {
           approved_by: user?.id,
           approved_at: new Date().toISOString(),
           recibo_numero: reciboNumero,
-          approved_pdf_path: path,
+          ...(pdfPath ? { approved_pdf_path: pdfPath } : {}),
         })
         .eq("id", r.id);
       if (error) throw error;
-      toast.success("Solicitud aprobada con PDF adjunto");
+      toast.success(pdfPath ? "Solicitud aprobada con PDF adjunto" : "Solicitud aprobada");
       setApproving(null);
       setApprovalPdf(null);
+      setManualReciboNumero("");
       load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo aprobar");
@@ -502,18 +510,18 @@ export default function AdminPanel() {
       <Dialog open={!!approving} onOpenChange={(o) => !o && setApproving(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{isUploadFlow(approving) ? "Aprobar con PDF" : "Aprobar solicitud"}</DialogTitle>
+            <DialogTitle>Aprobar Solicitud</DialogTitle>
           </DialogHeader>
           {isUploadFlow(approving) ? (
             <>
               <p className="text-sm text-muted-foreground">
-                Sube el PDF oficial generado en la plataforma externa para <strong>{approving?.nombre}</strong>.
+                Ingresa el consecutivo con el que salió la factura en la plataforma externa. Puedes adjuntar el PDF si lo tienes disponible.
               </p>
-              {approving?.attachments && approving.attachments.length > 0 && (
+              {approving?.attachments && (approving.attachments as {path:string;name:string}[]).length > 0 && (
                 <div className="rounded border border-border bg-muted/40 p-3">
                   <p className="text-xs font-semibold text-muted-foreground">Adjuntos del comercial:</p>
                   <ul className="mt-1 space-y-1 text-xs">
-                    {approving.attachments.map((a) => (
+                    {(approving.attachments as {path:string;name:string}[]).map((a) => (
                       <li key={a.path}>
                         <button type="button" className="text-primary hover:underline" onClick={() => openAttachment(a.path)}>{a.name}</button>
                       </li>
@@ -521,11 +529,25 @@ export default function AdminPanel() {
                   </ul>
                 </div>
               )}
-              <Input type="file" accept="application/pdf,.pdf" onChange={(e) => setApprovalPdf(e.target.files?.[0] ?? null)} />
-              {approvalPdf && <p className="text-xs text-muted-foreground">Archivo: {approvalPdf.name} ({(approvalPdf.size / 1024).toFixed(0)} KB)</p>}
+              <div className="space-y-1">
+                <label className="text-sm font-medium">N° Consecutivo *</label>
+                <Input
+                  type="number"
+                  min={1}
+                  placeholder="Ej: 1042"
+                  value={manualReciboNumero}
+                  onChange={(e) => setManualReciboNumero(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">Quedará registrado en la sección Numeración.</p>
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Sube aquí tu factura *</label>
+                <Input type="file" onChange={(e) => setApprovalPdf(e.target.files?.[0] ?? null)} />
+                {approvalPdf && <p className="text-xs text-muted-foreground">{approvalPdf.name} · {(approvalPdf.size / 1024).toFixed(0)} KB</p>}
+              </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setApproving(null)}>Cancelar</Button>
-                <Button onClick={confirmApproveUpload} disabled={!approvalPdf}>Aprobar y subir PDF</Button>
+                <Button onClick={confirmApproveUpload} disabled={!manualReciboNumero.trim() || !approvalPdf}>Aprobar</Button>
               </DialogFooter>
             </>
           ) : (
