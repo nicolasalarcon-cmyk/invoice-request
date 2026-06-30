@@ -23,6 +23,16 @@ import { listTemplates, type InvoiceTemplate } from "@/lib/invoice-template";
 type Status = "pendiente" | "aprobada" | "rechazada" | "requiere_info";
 type DocType = "orden_matricula" | "factura_usa" | "factura_colombia" | "factura_paypal";
 
+const REJECT_OPTIONS = [
+  { category: "Datos del tercero incompletos o incorrectos", description: "NIT, razón social, dirección o contacto inválidos, etc." },
+  { category: "Documentos soporte faltantes", description: "Orden de compra, contrato, cotización o acta pendiente" },
+  { category: "Programa no válido", description: "Código inexistente, inactivo o equivocado" },
+  { category: "Monto o concepto no corresponde", description: "Valor o descripción no coinciden con lo pactado" },
+  { category: "Solicitud duplicada", description: "Ya existe una solicitud activa para el mismo proveedor/concepto" },
+  { category: "Falta aprobación interna", description: "Requiere visto bueno de un superior o comité" },
+  { category: "Otra razón", description: null },
+] as const;
+
 interface AttachmentItem { path: string; name: string; size: number; type: string }
 
 interface Req {
@@ -102,7 +112,8 @@ export default function AdminPanel() {
   const [approvalPdf, setApprovalPdf] = useState<File | null>(null);
   const [manualReciboNumero, setManualReciboNumero] = useState<string>("");
   const [rejecting, setRejecting] = useState<Req | null>(null);
-  const [rejectReason, setRejectReason] = useState("");
+  const [rejectCategory, setRejectCategory] = useState("");
+  const [rejectOtherText, setRejectOtherText] = useState("");
   const [previewing, setPreviewing] = useState<Req | null>(null);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [pdfPreviewName, setPdfPreviewName] = useState("");
@@ -282,14 +293,23 @@ export default function AdminPanel() {
 
   const confirmReject = async () => {
     if (!rejecting) return;
-    if (!rejectReason.trim()) { toast.error("Escribe el motivo del rechazo."); return; }
+    if (!rejectCategory) { toast.error("Selecciona el motivo del rechazo."); return; }
+    if (rejectCategory === "Otra razón" && !rejectOtherText.trim()) {
+      toast.error("Describe el motivo específico."); return;
+    }
+    const opt = REJECT_OPTIONS.find(o => o.category === rejectCategory);
+    const reason = rejectCategory === "Otra razón"
+      ? `Otra razón — ${rejectOtherText.trim()}`
+      : `${rejectCategory} — ${opt?.description ?? ""}`;
     const { error } = await supabase
       .from("invoice_requests")
-      .update({ status: "rechazada", rejection_reason: rejectReason.trim() })
+      .update({ status: "rechazada", rejection_reason: reason })
       .eq("id", rejecting.id);
     if (error) return toast.error(error.message);
     toast.success("Solicitud rechazada — el comercial puede corregirla y reenviarla");
     setRejecting(null);
+    setRejectCategory("");
+    setRejectOtherText("");
     load();
   };
 
@@ -481,7 +501,20 @@ export default function AdminPanel() {
                         <Button size="sm" onClick={() => openApprove(r)}>
                           <CheckCircle2 className="mr-2 h-4 w-4" /> Aprobar
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => { setRejecting(r); setRejectReason(r.rejection_reason ?? ""); }}>
+                        <Button size="sm" variant="outline" onClick={() => {
+                          setRejecting(r);
+                          const existing = r.rejection_reason ?? "";
+                          const match = REJECT_OPTIONS.find(o => existing.startsWith(o.category));
+                          if (match) {
+                            setRejectCategory(match.category);
+                            setRejectOtherText(match.category === "Otra razón" ? existing.replace("Otra razón — ", "") : "");
+                          } else if (existing) {
+                            setRejectCategory("Otra razón");
+                            setRejectOtherText(existing);
+                          } else {
+                            setRejectCategory(""); setRejectOtherText("");
+                          }
+                        }}>
                           <XCircle className="mr-2 h-4 w-4" /> Rechazar
                         </Button>
                       </>
@@ -581,14 +614,46 @@ export default function AdminPanel() {
       </Dialog>
 
       {/* Rechazar */}
-      <Dialog open={!!rejecting} onOpenChange={(o) => !o && setRejecting(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Rechazar solicitud</DialogTitle></DialogHeader>
-          <p className="text-sm text-muted-foreground">Explica al comercial qué debe corregir.</p>
-          <Textarea rows={4} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="Ej: El valor de la matrícula no coincide con el programa, corrige y reenvía." autoFocus />
+      <Dialog open={!!rejecting} onOpenChange={(o) => { if (!o) { setRejecting(null); setRejectCategory(""); setRejectOtherText(""); } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Rechazar solicitud</DialogTitle>
+            <p className="text-sm text-muted-foreground pt-1">Selecciona el motivo — el comercial lo verá con la explicación completa.</p>
+          </DialogHeader>
+          <div className="space-y-2 py-1">
+            {REJECT_OPTIONS.map((opt) => (
+              <label
+                key={opt.category}
+                className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${rejectCategory === opt.category ? "border-destructive bg-destructive/5" : "hover:bg-muted/50"}`}
+              >
+                <input
+                  type="radio"
+                  name="rejectCategory"
+                  value={opt.category}
+                  checked={rejectCategory === opt.category}
+                  onChange={() => { setRejectCategory(opt.category); setRejectOtherText(""); }}
+                  className="mt-0.5 accent-destructive"
+                />
+                <div>
+                  <p className="text-sm font-medium leading-tight">{opt.category}</p>
+                  {opt.description && <p className="text-xs text-muted-foreground mt-0.5">{opt.description}</p>}
+                </div>
+              </label>
+            ))}
+            {rejectCategory === "Otra razón" && (
+              <Textarea
+                rows={3}
+                value={rejectOtherText}
+                onChange={(e) => setRejectOtherText(e.target.value)}
+                placeholder="Describe el motivo específico..."
+                className="mt-1"
+                autoFocus
+              />
+            )}
+          </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRejecting(null)}>Cancelar</Button>
-            <Button variant="destructive" onClick={confirmReject}>Rechazar</Button>
+            <Button variant="outline" onClick={() => { setRejecting(null); setRejectCategory(""); setRejectOtherText(""); }}>Cancelar</Button>
+            <Button variant="destructive" onClick={confirmReject} disabled={!rejectCategory || (rejectCategory === "Otra razón" && !rejectOtherText.trim())}>Rechazar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
