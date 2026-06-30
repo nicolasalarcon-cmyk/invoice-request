@@ -88,6 +88,7 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           approved_pdf_path: string | null
+          archived_by_comercial: boolean
           attachments: Json
           ciudad: string | null
           codigo_estudiante: string | null
@@ -147,6 +148,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           approved_pdf_path?: string | null
+          archived_by_comercial?: boolean
           attachments?: Json
           ciudad?: string | null
           codigo_estudiante?: string | null
@@ -206,6 +208,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           approved_pdf_path?: string | null
+          archived_by_comercial?: boolean
           attachments?: Json
           ciudad?: string | null
           codigo_estudiante?: string | null

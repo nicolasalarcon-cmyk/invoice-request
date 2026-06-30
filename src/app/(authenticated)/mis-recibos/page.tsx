@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { formatCOP, formatDate } from "@/lib/format";
-import { FileDown, FilePlus, Inbox, MessageSquare, Search, Pencil, Trash2, Eye } from "lucide-react";
+import { FileDown, FilePlus, Inbox, MessageSquare, Search, Pencil, Archive, Eye } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 type Status = "pendiente" | "aprobada" | "rechazada" | "requiere_info";
@@ -52,6 +52,7 @@ interface Req {
   convocatoria: string | null;
   attachments: AttachmentItem[] | null;
   approved_pdf_path: string | null;
+  archived_by_comercial: boolean;
 }
 
 export default function MisRecibos() {
@@ -69,6 +70,7 @@ export default function MisRecibos() {
         .from("invoice_requests")
         .select("*")
         .eq("created_by", user.id)
+        .eq("archived_by_comercial", false)
         .order("created_at", { ascending: false });
       if (error) toast.error(error.message);
       else setItems((data ?? []) as unknown as Req[]);
@@ -198,12 +200,12 @@ export default function MisRecibos() {
     a.remove();
   };
 
-  const deleteRequest = async (r: Req) => {
-    if (!confirm(`¿Eliminar el recibo de ${r.nombre}? Esta acción no se puede deshacer.`)) return;
-    const { error } = await supabase.from("invoice_requests").delete().eq("id", r.id);
+  const archiveRequest = async (r: Req) => {
+    if (!confirm(`¿Quitar el recibo de ${r.nombre} de tu lista? Seguirá disponible en el histórico de la plataforma.`)) return;
+    const { error } = await supabase.from("invoice_requests").update({ archived_by_comercial: true }).eq("id", r.id);
     if (error) { toast.error(error.message); return; }
     setItems((prev) => prev.filter((x) => x.id !== r.id));
-    toast.success("Recibo eliminado");
+    toast.success("Recibo quitado de tu lista");
   };
 
   return (
@@ -320,8 +322,8 @@ export default function MisRecibos() {
                     </>
                   )}
                   {(r.status === "aprobada" || r.status === "rechazada") && (
-                    <Button size="sm" variant="destructive" onClick={() => deleteRequest(r)}>
-                      <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                    <Button size="sm" variant="outline" onClick={() => archiveRequest(r)}>
+                      <Archive className="mr-2 h-4 w-4" /> Quitar de mi lista
                     </Button>
                   )}
                 </div>
