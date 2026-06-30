@@ -389,6 +389,10 @@ function DateRow({
 function InvoiceCopy({ d, label }: { d: OrdenData; label: "ALUMNO" | "UNIVERSIDAD" }) {
   return (
     <View style={s.copy}>
+      {/* ── WATERMARK ── */}
+      <View style={{ position: "absolute", top: 0, left: 0, right: 16, bottom: 0, alignItems: "center", justifyContent: "center" }}>
+        <Text style={{ fontSize: 155, fontWeight: "bold", color: NAVY, opacity: 0.07 }}>UC</Text>
+      </View>
       <View style={s.main}>
         {/* ── HEADER ── */}
         <View style={s.header}>
@@ -406,6 +410,8 @@ function InvoiceCopy({ d, label }: { d: OrdenData; label: "ALUMNO" | "UNIVERSIDA
             <Text style={s.nitLine}>Vigilada por el Ministerio de Educación Nacional</Text>
             <Text style={s.nitLine}>Resolución Número 21329</Text>
             <Text style={s.nitLine}>Código de Institución SNIES 9923</Text>
+            <Text style={s.nitLine}>Teléfono: 305 9140563</Text>
+            <Text style={s.nitLine}>Correo: info@altatec.org</Text>
           </View>
 
           {/* Right: description + recibo box */}
