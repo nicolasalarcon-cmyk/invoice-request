@@ -527,15 +527,15 @@ export default function AdminPanel() {
                         <Eye className="mr-2 h-4 w-4" /> Vista previa PDF
                       </Button>
                     )}
+                    {r.status === "aprobada" && (
+                      <Button size="sm" onClick={() => downloadPdf(r)}>
+                        <FileDown className="mr-2 h-4 w-4" /> Descargar PDF
+                      </Button>
+                    )}
                     {!isCartera && r.status === "aprobada" && (
-                      <>
-                        <Button size="sm" onClick={() => downloadPdf(r)}>
-                          <FileDown className="mr-2 h-4 w-4" /> Descargar PDF
-                        </Button>
-                        <Button size="sm" variant="secondary" onClick={() => duplicar(r)}>
-                          <Copy className="mr-2 h-4 w-4" /> Duplicar
-                        </Button>
-                      </>
+                      <Button size="sm" variant="secondary" onClick={() => duplicar(r)}>
+                        <Copy className="mr-2 h-4 w-4" /> Duplicar
+                      </Button>
                     )}
                     {canDelete && (
                       <Button size="sm" className="ml-auto bg-red-800 hover:bg-red-900 text-white border-0" onClick={() => removeRequest(r)}>
