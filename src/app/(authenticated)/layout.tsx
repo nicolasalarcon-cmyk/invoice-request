@@ -19,27 +19,48 @@ const ROLE_LABELS: Record<string, string> = {
   comercial: "Comercial",
 };
 
-function NavTab({ href, icon, label, badge }: { href: string; icon: React.ReactNode; label: string; badge?: string }) {
+function NavTab({
+  href, icon, label, badge, small,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+  badge?: string;
+  small?: boolean;
+}) {
   const pathname = usePathname();
-  const active = pathname === href || (href !== "/admin" && pathname.startsWith(href));
+  const active =
+    href === "/admin"
+      ? pathname === "/admin"
+      : pathname === href || pathname.startsWith(href + "/");
+
   return (
     <Link
       href={href}
-      className={`flex items-center gap-2 rounded-t-xl border-b-2 px-4 py-2.5 text-sm font-medium transition-all duration-200 ${
-        active
-          ? "border-blue-600 bg-white text-blue-600 shadow-sm"
-          : "border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-      }`}
+      className={`relative flex items-center gap-1.5 px-3.5 py-3 font-medium transition-all duration-150 select-none
+        ${small ? "text-sm" : "text-[15px]"}
+        ${active
+          ? "text-blue-700"
+          : "text-slate-500 hover:text-slate-800"
+        }`}
     >
       {icon}
       {label}
       {badge && (
-        <span className="ml-1 rounded-full bg-blue-500 px-1.5 py-0.5 text-[10px] font-bold text-white leading-none">
+        <span className="ml-0.5 rounded-full bg-blue-700 px-1.5 py-0.5 text-[10px] font-bold text-white leading-none">
           {badge}
         </span>
       )}
+      {/* active underline */}
+      {active && (
+        <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-blue-700" />
+      )}
     </Link>
   );
+}
+
+function NavDivider() {
+  return <div className="mx-1 my-auto h-4 w-px self-center bg-slate-200" />;
 }
 
 export default function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
@@ -69,23 +90,25 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
 
   const badgeCount = pendingCount > 0 ? (pendingCount > 99 ? "99+" : String(pendingCount)) : undefined;
 
+  const hasConfigTabs = canViewNumeracion || canManagePrograms || canManageTemplates || canManageUsers;
+
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b border-slate-100 shadow-sm" style={{ background: "linear-gradient(to right, rgba(239,246,255,0.95), rgba(240,249,255,0.6), white)", backdropFilter: "blur(8px)" }}>
+      <header className="sticky top-0 z-50 border-b border-slate-200 shadow-sm bg-white/95 backdrop-blur-sm">
         {/* Top bar */}
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
-          <Link href="/login" className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl shadow-md" style={{ background: "linear-gradient(135deg, #3B82F6, #6366F1)" }}>
               <FileText className="h-5 w-5 text-white" />
             </div>
             <div>
               <span className="block text-base font-bold leading-none text-slate-900">Recibos</span>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-blue-600">UdeCataluña</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-blue-700">UdeCataluña</span>
             </div>
           </Link>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 rounded-full border border-slate-100 bg-white/80 px-3 py-1.5 shadow-sm">
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white">
+            <div className="flex items-center gap-2 rounded-full border border-slate-100 bg-slate-50 px-3 py-1.5">
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-700 text-xs font-bold text-white">
                 {(profile?.nombre_completo ?? user.email ?? "U")[0].toUpperCase()}
               </div>
               <div className="hidden sm:block text-left">
@@ -104,37 +127,42 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
               className="rounded-xl p-2 text-slate-400 transition-all hover:bg-rose-50 hover:text-rose-600"
               title="Cerrar sesión"
             >
-              <LogOut className="h-5 w-5" />
+              <LogOut className="h-4 w-4" />
             </button>
           </div>
         </div>
 
         {/* Tab navigation */}
-        <div className="mx-auto max-w-7xl px-6">
-          <nav className="flex gap-1">
-            {canViewDashboard && (
-              <NavTab href="/admin/dashboard" icon={<LayoutDashboard className="h-4 w-4" />} label="Dashboard" />
-            )}
+        <div className="mx-auto max-w-7xl px-4">
+          <nav className="flex items-center gap-0.5">
+
+            {/* ── Tabs operativas (orden por frecuencia de uso) ── */}
             {canViewAllRequests && (
               <NavTab href="/admin" icon={<ClipboardList className="h-4 w-4" />} label="Solicitudes" badge={badgeCount} />
             )}
-            {/* Crear: todos los roles */}
             <NavTab href="/solicitar" icon={<FilePlus className="h-4 w-4" />} label="Crear" />
-            {/* Mis recibos: solo comercial (no ve la bandeja completa) */}
             {!canViewAllRequests && (
               <NavTab href="/mis-recibos" icon={<ClipboardList className="h-4 w-4" />} label="Mis recibos" />
             )}
+            {canViewDashboard && (
+              <NavTab href="/admin/dashboard" icon={<LayoutDashboard className="h-4 w-4" />} label="Dashboard" />
+            )}
+
+            {/* ── Separador ── */}
+            {hasConfigTabs && <NavDivider />}
+
+            {/* ── Tabs de configuración ── */}
             {canViewNumeracion && (
-              <NavTab href="/admin/numeracion" icon={<Hash className="h-4 w-4" />} label="Numeración" />
+              <NavTab href="/admin/numeracion" icon={<Hash className="h-3.5 w-3.5" />} label="Numeración" small />
             )}
             {canManagePrograms && (
-              <NavTab href="/admin/programas" icon={<BookOpen className="h-4 w-4" />} label="Programas" />
+              <NavTab href="/admin/programas" icon={<BookOpen className="h-3.5 w-3.5" />} label="Programas" small />
             )}
             {canManageTemplates && (
-              <NavTab href="/admin/plantillas" icon={<LayoutTemplate className="h-4 w-4" />} label="Plantillas" />
+              <NavTab href="/admin/plantillas" icon={<LayoutTemplate className="h-3.5 w-3.5" />} label="Plantillas" small />
             )}
             {canManageUsers && (
-              <NavTab href="/admin/usuarios" icon={<Users className="h-4 w-4" />} label="Usuarios" />
+              <NavTab href="/admin/usuarios" icon={<Users className="h-3.5 w-3.5" />} label="Usuarios" small />
             )}
           </nav>
         </div>
