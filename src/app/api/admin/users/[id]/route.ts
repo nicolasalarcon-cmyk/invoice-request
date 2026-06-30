@@ -10,7 +10,7 @@ async function getAdminUser(request: NextRequest) {
     .from("user_roles")
     .select("role")
     .eq("user_id", user.id)
-    .eq("role", "admin")
+    .in("role", ["super_admin", "admin"])
     .maybeSingle();
   if (!data) return null;
   return user;
@@ -24,7 +24,7 @@ export async function PUT(
   if (!adminUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
-  const body = await request.json() as { action: "password" | "role"; password?: string; role?: "admin" | "comercial" };
+  const body = await request.json() as { action: "password" | "role"; password?: string; role?: "super_admin" | "admin" | "financiera" | "cartera" | "comercial" };
 
   if (body.action === "password") {
     if (!body.password) return NextResponse.json({ error: "Missing password" }, { status: 400 });
