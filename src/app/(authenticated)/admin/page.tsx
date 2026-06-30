@@ -51,6 +51,9 @@ interface Req {
   descuento_pct: number;
   descuento_bono: number;
   valor_total: number;
+  valor_total_empresa: number | null;
+  numero_participantes: number | null;
+  participantes: { nombre: string; cedula: string; email: string; telefono: string }[] | null;
   recargo_total: number;
   fecha_limite_pago: string | null;
   fecha_pago_extraordinario: string | null;
@@ -332,6 +335,9 @@ export default function AdminPanel() {
       horas_programa: r.horas_programa, duracion: r.duracion, convocatoria: r.convocatoria,
       matricula: Number(r.matricula), descuento_pct: Number(r.descuento_pct ?? 0),
       descuento_bono: Number(r.descuento_bono ?? 0), valor_total: Number(r.valor_total ?? 0),
+      valor_total_empresa: r.valor_total_empresa ? Number(r.valor_total_empresa) : null,
+      numero_participantes: r.numero_participantes,
+      participantes: r.participantes,
       recargo_total: Number(r.recargo_total), fecha_limite_pago: r.fecha_limite_pago,
       fecha_pago_extraordinario: r.fecha_pago_extraordinario, template_id: r.template_id,
       tipo_programa: r.tipo_programa, document_type: r.document_type,
@@ -455,7 +461,7 @@ export default function AdminPanel() {
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-muted-foreground">Valor a pagar</p>
-                      <p className="text-lg font-bold text-foreground">{formatCOP(r.valor_total)}</p>
+                      <p className="text-lg font-bold text-foreground">{formatCOP(r.valor_total_empresa ?? r.valor_total)}</p>
                       <p className="text-xs text-muted-foreground">
                         Valor {formatCOP(r.matricula)} · Desc. {Number(r.descuento_pct ?? 0)}%
                         {Number(r.descuento_bono ?? 0) > 0 && ` · Bono ${formatCOP(r.descuento_bono)}`}

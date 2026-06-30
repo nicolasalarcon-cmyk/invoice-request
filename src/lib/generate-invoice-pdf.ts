@@ -5,11 +5,21 @@ import type { ResolverData } from "./invoice-layout";
 import { OrdenMatriculaDocument } from "./pdf-react/orden-matricula";
 import { FacturaUSADocument } from "./pdf-react/factura-usa";
 
+export interface Participant {
+  nombre: string;
+  cedula: string;
+  email: string;
+  telefono: string;
+}
+
 export interface InvoiceData extends ResolverData {
   template_id?: string | null;
   tipo_programa?: string | null;
   document_type?: string | null;
   valor_total?: number | null;
+  valor_total_empresa?: number | null;
+  numero_participantes?: number | null;
+  participantes?: Participant[] | null;
   descuento?: number | null;
   // Factura USA fields
   empresa?: string | null;

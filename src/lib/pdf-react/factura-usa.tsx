@@ -161,9 +161,12 @@ export function FacturaUSADocument({
   data: InvoiceData;
   _tpl: InvoiceTemplate;
 }) {
-  const subtotal = Number(data.matricula) || 0;
-  const descuento = Number(data.descuento_bono) || Number(data.descuento) || 0;
-  const total = Number(data.valor_total) || Math.max(subtotal - descuento, 0);
+  const n = Math.max(Number(data.numero_participantes) || 1, 1);
+  const subtotalUnit = Number(data.matricula) || 0;
+  const descuentoUnit = Number(data.descuento_bono) || Number(data.descuento) || 0;
+  const subtotal = subtotalUnit * n;
+  const descuento = descuentoUnit * n;
+  const total = Number(data.valor_total_empresa) || Number(data.valor_total) || Math.max(subtotal - descuento, 0);
 
   const mainDesc =
     [data.nemonico, data.programa].filter(Boolean).join(" ").trim() ||
@@ -171,6 +174,7 @@ export function FacturaUSADocument({
     data.plan_estudio ||
     "Programa";
   const participante = [data.nombre, data.identificacion].filter(Boolean).join("  ");
+  const participantes = (data.participantes ?? []) as { nombre: string; cedula: string; email: string; telefono: string }[];
 
   return (
     <Document>
@@ -249,16 +253,22 @@ export function FacturaUSADocument({
 
         <View style={s.tableRow}>
           <View style={s.colQty}>
-            <Text style={{ fontSize: 9, color: "#28292C" }}>1</Text>
+            <Text style={{ fontSize: 9, color: "#28292C" }}>{n}</Text>
           </View>
           <View style={s.colDesc}>
             <Text style={s.descMain}>{mainDesc}</Text>
-            {participante ? (
+            {participantes.length > 0 ? (
+              participantes.map((p, i) => (
+                <Text key={i} style={s.descSub}>
+                  {i + 1}. {[p.nombre, p.cedula, p.email, p.telefono].filter(Boolean).join(" · ")}
+                </Text>
+              ))
+            ) : participante ? (
               <Text style={s.descSub}>Participante: {participante}</Text>
             ) : null}
           </View>
           <View style={s.colUnit}>
-            <Text style={{ fontSize: 9, color: "#28292C" }}>{usd(subtotal)}</Text>
+            <Text style={{ fontSize: 9, color: "#28292C" }}>{usd(subtotalUnit)}</Text>
           </View>
           <View style={s.colTotal}>
             <Text style={{ fontSize: 9, color: "#28292C" }}>{usd(subtotal)}</Text>
