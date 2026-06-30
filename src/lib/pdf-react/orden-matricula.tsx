@@ -26,12 +26,7 @@ function fmtCOP(n: number) {
 }
 
 function academicName(d: InvoiceData): string {
-  const tipo = (d.tipo_programa ?? "").toLowerCase();
-  if (tipo.includes("diplomado")) {
-    if (d.codigo_snies === "108572") return "Administración de Empresas";
-    if (d.codigo_snies === "109334") return "Ingeniería Informática";
-  }
-  return d.programa;
+  return d.codigo_snies ?? d.programa;
 }
 
 export interface OrdenData {
@@ -87,7 +82,6 @@ export function resolveOrdenData(data: InvoiceData, tpl: InvoiceTemplate): Orden
         ? data.identificacion.slice(-4)
         : "—";
 
-  const snies = data.codigo_snies ? ` Código SNIES ${data.codigo_snies}` : "";
 
   return {
     nit: tpl.nit,
@@ -100,8 +94,8 @@ export function resolveOrdenData(data: InvoiceData, tpl: InvoiceTemplate): Orden
     nombre: data.nombre,
     identificacion: data.identificacion,
     codigo_estudiante: codigo_est,
-    programa_full: `${academicName(data)}${snies}`,
-    plan_estudio: data.plan_estudio ?? "—",
+    programa_full: academicName(data),
+    plan_estudio: (data.plan_estudio ?? "—").replace(/\bDiplomado\b\s*/gi, "").trim() || "—",
     periodo: data.periodo,
     cohorte: data.cohorte ?? "—",
     fecha_inicio: data.convocatoria ?? data.fecha_inicio ?? "—",

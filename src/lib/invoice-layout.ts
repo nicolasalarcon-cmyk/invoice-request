@@ -204,14 +204,7 @@ export interface ResolverTpl {
 }
 
 function academicProgramName(d: ResolverData): string {
-  // Para Diplomados el "Programa Académico de Educación Superior" es el programa madre según SNIES.
-  // Para Especializaciones el programa ya es académico (mantener el nombre).
-  const tipo = (d.tipo_programa ?? "").toLowerCase();
-  if (tipo.includes("diplomado")) {
-    if (d.codigo_snies === "108572") return "Administración de Empresas";
-    if (d.codigo_snies === "109334") return "Ingeniería Informática";
-  }
-  return d.programa;
+  return d.codigo_snies ?? d.programa;
 }
 
 export function resolveField(el: FieldEl, d: ResolverData, tpl: ResolverTpl): string {
@@ -233,11 +226,11 @@ export function resolveField(el: FieldEl, d: ResolverData, tpl: ResolverTpl): st
       break;
     case "programa": raw = academicProgramName(d); break;
     case "codigo_snies": raw = d.codigo_snies ?? "—"; break;
-    case "programa_full": raw = `${academicProgramName(d)}${d.codigo_snies ? " Código SNIES " + d.codigo_snies : ""}`; break;
+    case "programa_full": raw = academicProgramName(d); break;
     case "programa_cohorte": raw = `${d.programa}${d.cohorte ? " " + d.cohorte : ""}`; break;
     case "periodo": raw = d.periodo; break;
     case "cohorte": raw = d.cohorte ?? "—"; break;
-    case "plan_estudio": raw = d.plan_estudio ?? "—"; break;
+    case "plan_estudio": raw = (d.plan_estudio ?? "—").replace(/\bDiplomado\b\s*/gi, "").trim() || "—"; break;
     case "fecha_inicio": raw = d.convocatoria ?? d.fecha_inicio ?? "—"; break;
     case "fecha_fin": raw = d.fecha_fin ?? "—"; break;
     case "horas_programa": {
