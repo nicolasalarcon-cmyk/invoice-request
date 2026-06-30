@@ -77,7 +77,7 @@ const STATUS_COLORS: Record<Status, string> = {
 };
 
 export default function Numeracion() {
-  const { canViewNumeracion: isAdmin } = useAuth();
+  const { canViewNumeracion: isAdmin, canDelete } = useAuth();
   const [rows, setRows]               = useState<Row[]>([]);
   const [loading, setLoading]         = useState(true);
   const [q, setQ]                     = useState("");
@@ -317,9 +317,11 @@ export default function Numeracion() {
                               <Download className="h-4 w-4" />
                             </Button>
                           )}
-                          <Button size="sm" variant="ghost" title="Eliminar registro" onClick={() => removeRow(r)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                          {canDelete && (
+                            <Button size="sm" variant="ghost" title="Eliminar registro" onClick={() => removeRow(r)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>
