@@ -56,7 +56,7 @@ const USA_SAMPLE = {
 };
 
 export default function EditorPage() {
-  const { isAdmin, loading, user } = useAuth();
+  const { canManageTemplates: isAdmin, loading, user } = useAuth();
   const params = useParams();
   const id = params.id as string;
   const router = useRouter();

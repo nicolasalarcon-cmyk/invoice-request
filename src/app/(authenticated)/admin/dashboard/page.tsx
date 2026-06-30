@@ -60,7 +60,7 @@ function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: 
 }
 
 export default function Dashboard() {
-  const { isAdmin } = useAuth();
+  const { canViewDashboard: isAdmin } = useAuth();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");

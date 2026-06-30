@@ -1,6 +1,10 @@
+"use client";
+
 import { useEffect, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+
+export type AppRole = "super_admin" | "admin" | "financiera" | "cartera" | "comercial" | "user";
 
 interface Profile {
   nombre_completo: string | null;
@@ -10,8 +14,7 @@ interface Profile {
 export function useAuth() {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [isAdmin, setIsAdmin] = useState<boolean>(false);
-  const [isComercial, setIsComercial] = useState<boolean>(false);
+  const [role, setRole] = useState<AppRole | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -36,9 +39,11 @@ export function useAuth() {
                 .maybeSingle(),
             ]);
             if (!mounted) return;
-            const list = (roles ?? []).map((r) => r.role as string);
-            setIsAdmin(list.includes("admin"));
-            setIsComercial(list.includes("comercial") || list.includes("admin"));
+            const list = (roles ?? []).map((r) => r.role as AppRole);
+            // Priority: super_admin > admin > financiera > cartera > comercial > user
+            const priority: AppRole[] = ["super_admin", "admin", "financiera", "cartera", "comercial", "user"];
+            const resolved = priority.find((r) => list.includes(r)) ?? null;
+            setRole(resolved);
             setProfile(prof ?? { nombre_completo: s.user.email ?? null, email: s.user.email ?? null });
             setLoading(false);
           } catch {
@@ -46,8 +51,7 @@ export function useAuth() {
           }
         }, 0);
       } else {
-        setIsAdmin(false);
-        setIsComercial(false);
+        setRole(null);
         setProfile(null);
         setLoading(false);
       }
@@ -56,14 +60,8 @@ export function useAuth() {
     let lastUserId: string | null = null;
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
       if (!s && !initialSessionChecked) return;
-      // Evita re-hidratar (y refetch en cascada) cuando Supabase re-emite eventos
-      // al recuperar foco de la pestaña (TOKEN_REFRESHED, USER_UPDATED, SIGNED_IN
-      // con el mismo usuario, INITIAL_SESSION repetido, etc.).
       const nextId = s?.user?.id ?? null;
-      if (initialSessionChecked && nextId === lastUserId && event !== "SIGNED_OUT") {
-        return;
-      }
-
+      if (initialSessionChecked && nextId === lastUserId && event !== "SIGNED_OUT") return;
       lastUserId = nextId;
       hydrate(s);
     });
@@ -83,5 +81,25 @@ export function useAuth() {
     };
   }, []);
 
-  return { session, user, isAdmin, isComercial, profile, loading };
+  // ─── Permisos derivados del rol ───────────────────────────────────────────────
+  const isAdmin         = role === "super_admin" || role === "admin";
+  const canApprove      = role === "super_admin" || role === "admin" || role === "financiera";
+  const canDelete       = role === "super_admin" || role === "admin";
+  const canManageUsers  = role === "super_admin";
+  const canViewDashboard     = role === "super_admin" || role === "admin" || role === "financiera";
+  const canViewNumeracion    = role === "super_admin" || role === "admin" || role === "financiera" || role === "cartera";
+  const canManageTemplates   = role === "super_admin" || role === "admin";
+  const canManagePrograms    = role === "super_admin" || role === "admin";
+  const canViewAllRequests   = role === "super_admin" || role === "admin" || role === "financiera" || role === "cartera";
+  const isCartera       = role === "cartera";
+  const isComercial     = role !== null; // todos pueden crear solicitudes
+
+  return {
+    session, user, role, profile, loading,
+    isAdmin, isComercial, isCartera,
+    canApprove, canDelete, canManageUsers,
+    canViewDashboard, canViewNumeracion,
+    canManageTemplates, canManagePrograms,
+    canViewAllRequests,
+  };
 }

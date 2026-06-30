@@ -18,7 +18,7 @@ const EMPTY: Omit<Programa, "id"> = {
 };
 
 export default function ProgramasPage() {
-  const { isAdmin, loading } = useAuth();
+  const { canManagePrograms: isAdmin, loading } = useAuth();
   const [items, setItems] = useState<Programa[]>([]);
   const [editing, setEditing] = useState<(Omit<Programa, "id"> & { id?: string }) | null>(null);
   const [busy, setBusy] = useState(false);

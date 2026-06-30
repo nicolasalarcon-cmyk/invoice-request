@@ -65,7 +65,8 @@ const EMPTY: PpForm = {
 };
 
 export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string; duplicateFromId?: string }) {
-  const { user, isAdmin, isComercial, profile } = useAuth();
+  const { user, canApprove, canViewAllRequests, isComercial, profile } = useAuth();
+  const isAdmin = canApprove;
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState<PpForm>(EMPTY);
@@ -237,7 +238,7 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
         if (error) throw error;
         toast.success("Solicitud enviada");
       }
-      router.push(isAdmin ? "/admin" : "/mis-recibos");
+      router.push(canViewAllRequests ? "/admin" : "/mis-recibos");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "No se pudo guardar");
     } finally {

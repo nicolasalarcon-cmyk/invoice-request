@@ -17,7 +17,7 @@ const TOGGLEABLE = [
 ];
 
 export default function FormularioPage() {
-  const { isAdmin } = useAuth();
+  const { canManageTemplates: isAdmin } = useAuth();
   const [cfg, setCfg] = useState<FormConfig | null>(null);
   const [busy, setBusy] = useState(false);
   const [newConcepto, setNewConcepto] = useState("");

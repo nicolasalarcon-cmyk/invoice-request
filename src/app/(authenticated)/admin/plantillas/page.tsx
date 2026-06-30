@@ -11,7 +11,7 @@ import { clearTemplateCache, getTemplateDocType, type InvoiceTemplate } from "@/
 import { Plus, Copy, Trash2, Star, LayoutTemplate, Pencil } from "lucide-react";
 
 export default function PlantillasPage() {
-  const { isAdmin, loading, user } = useAuth();
+  const { canManageTemplates: isAdmin, loading, user } = useAuth();
   const [templates, setTemplates] = useState<InvoiceTemplate[]>([]);
 
   const load = async () => {

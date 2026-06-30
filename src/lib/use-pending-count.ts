@@ -1,38 +1,32 @@
+"use client";
+
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-/**
- * Cuenta de solicitudes pendientes con suscripción Realtime.
- * Se actualiza solo cuando llegan nuevas o cambian de estado.
- */
-export function usePendingCount(enabled: boolean) {
+export function usePendingCount(enabled: boolean): number {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
     if (!enabled) return;
-    let cancelled = false;
+    let mounted = true;
 
-    const refresh = async () => {
-      const { count: c } = await supabase
+    const load = async () => {
+      const { count: n } = await supabase
         .from("invoice_requests")
-        .select("id", { count: "exact", head: true })
+        .select("*", { count: "exact", head: true })
         .eq("status", "pendiente");
-      if (!cancelled) setCount(c ?? 0);
+      if (mounted) setCount(n ?? 0);
     };
 
-    refresh();
+    load();
 
     const channel = supabase
-      .channel("invoice_requests_pending")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "invoice_requests" },
-        () => refresh(),
-      )
+      .channel("pending_count_badge")
+      .on("postgres_changes", { event: "*", schema: "public", table: "invoice_requests" }, load)
       .subscribe();
 
     return () => {
-      cancelled = true;
+      mounted = false;
       supabase.removeChannel(channel);
     };
   }, [enabled]);

@@ -77,7 +77,7 @@ const STATUS_COLORS: Record<Status, string> = {
 };
 
 export default function Numeracion() {
-  const { isAdmin } = useAuth();
+  const { canViewNumeracion: isAdmin } = useAuth();
   const [rows, setRows]               = useState<Row[]>([]);
   const [loading, setLoading]         = useState(true);
   const [q, setQ]                     = useState("");

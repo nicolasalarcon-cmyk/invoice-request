@@ -25,7 +25,7 @@ const OPTIONS: Array<{
 ];
 
 function SolicitarInner() {
-  const { user, isAdmin, isComercial, loading } = useAuth();
+  const { user, isComercial, loading } = useAuth();
   const searchParams = useSearchParams();
   const editId = searchParams.get("id") ?? undefined;
   const duplicateFromId = searchParams.get("duplicar") ?? undefined;
@@ -55,7 +55,7 @@ function SolicitarInner() {
   if (loading) {
     return <main className="mx-auto max-w-4xl px-6 py-8 text-sm text-muted-foreground">Cargando…</main>;
   }
-  if (!isComercial && !isAdmin) {
+  if (!isComercial) {
     return (
       <main className="mx-auto max-w-4xl px-6 py-8">
         <p className="text-sm text-muted-foreground">Tu cuenta no tiene permisos.</p>

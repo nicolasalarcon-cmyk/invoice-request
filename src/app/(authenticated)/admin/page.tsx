@@ -99,7 +99,7 @@ async function sendInvoiceEmail(data: {
 }
 
 export default function AdminPanel() {
-  const { isAdmin, loading: authLoading } = useAuth();
+  const { isAdmin, isCartera, canApprove, canDelete, canViewAllRequests, loading: authLoading } = useAuth();
   const [items, setItems] = useState<Req[]>([]);
   const [templates, setTemplates] = useState<InvoiceTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -132,10 +132,10 @@ export default function AdminPanel() {
     setLoading(false);
   };
 
-  useEffect(() => { if (isAdmin) load(); }, [isAdmin]);
+  useEffect(() => { if (canViewAllRequests) load(); }, [canViewAllRequests]);
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!canViewAllRequests) return;
     const channel = supabase
       .channel("invoice_requests_inbox")
       .on("postgres_changes", { event: "*", schema: "public", table: "invoice_requests" }, () => load())
@@ -183,11 +183,11 @@ export default function AdminPanel() {
   }, [items, q, statusFilter, tipoFilter, dateFrom]);
 
   if (authLoading) return <p className="p-6 text-sm text-muted-foreground">Cargando…</p>;
-  if (!isAdmin) {
+  if (!canViewAllRequests) {
     return (
       <main className="mx-auto max-w-md px-6 py-16 text-center">
         <h1 className="text-2xl font-bold">Acceso restringido</h1>
-        <p className="mt-2 text-muted-foreground">Tu cuenta no tiene rol de administrador.</p>
+        <p className="mt-2 text-muted-foreground">Tu cuenta no tiene acceso a esta sección.</p>
       </main>
     );
   }
@@ -493,10 +493,12 @@ export default function AdminPanel() {
                     <Button size="sm" variant="ghost" onClick={() => setPreviewing(r)}>
                       <Eye className="mr-2 h-4 w-4" /> Ver
                     </Button>
-                    <Link href={`/solicitar?id=${r.id}`}>
-                      <Button size="sm" variant="ghost"><Pencil className="mr-2 h-4 w-4" /> Editar</Button>
-                    </Link>
-                    {(r.status === "pendiente" || r.status === "requiere_info") && (
+                    {!isCartera && (
+                      <Link href={`/solicitar?id=${r.id}`}>
+                        <Button size="sm" variant="ghost"><Pencil className="mr-2 h-4 w-4" /> Editar</Button>
+                      </Link>
+                    )}
+                    {!isCartera && canApprove && (r.status === "pendiente" || r.status === "requiere_info") && (
                       <>
                         <Button size="sm" onClick={() => openApprove(r)}>
                           <CheckCircle2 className="mr-2 h-4 w-4" /> Aprobar
@@ -524,7 +526,7 @@ export default function AdminPanel() {
                         <Eye className="mr-2 h-4 w-4" /> Vista previa PDF
                       </Button>
                     )}
-                    {r.status === "aprobada" && (
+                    {!isCartera && r.status === "aprobada" && (
                       <>
                         <Button size="sm" onClick={() => downloadPdf(r)}>
                           <FileDown className="mr-2 h-4 w-4" /> Descargar PDF
@@ -534,9 +536,11 @@ export default function AdminPanel() {
                         </Button>
                       </>
                     )}
-                    <Button size="sm" variant="destructive" className="ml-auto" onClick={() => removeRequest(r)}>
-                      <Trash2 className="mr-2 h-4 w-4" /> Eliminar
-                    </Button>
+                    {canDelete && (
+                      <Button size="sm" variant="destructive" className="ml-auto" onClick={() => removeRequest(r)}>
+                        <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                      </Button>
+                    )}
                   </div>
                 </div>
               );

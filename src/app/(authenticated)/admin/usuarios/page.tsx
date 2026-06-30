@@ -29,7 +29,16 @@ async function apiUsers(token: string): Promise<AppUser[]> {
   return res.json() as Promise<AppUser[]>;
 }
 
-async function apiCreateUser(token: string, data: { email: string; password: string; nombre: string; role: "admin" | "comercial" }) {
+type AppRoleOption = "super_admin" | "admin" | "financiera" | "cartera" | "comercial";
+const ROLE_OPTIONS: { value: AppRoleOption; label: string }[] = [
+  { value: "super_admin",  label: "SuperAdministrador" },
+  { value: "admin",        label: "Administrador" },
+  { value: "financiera",   label: "Financiera" },
+  { value: "cartera",      label: "Cartera" },
+  { value: "comercial",    label: "Comercial" },
+];
+
+async function apiCreateUser(token: string, data: { email: string; password: string; nombre: string; role: AppRoleOption }) {
   const res = await fetch("/api/admin/users", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -47,7 +56,7 @@ async function apiUpdatePassword(token: string, userId: string, password: string
   if (!res.ok) throw new Error((await res.json() as { error: string }).error);
 }
 
-async function apiUpdateRole(token: string, userId: string, role: "admin" | "comercial") {
+async function apiUpdateRole(token: string, userId: string, role: AppRoleOption) {
   const res = await fetch(`/api/admin/users/${userId}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -65,12 +74,12 @@ async function apiDeleteUser(token: string, userId: string) {
 }
 
 export default function UsersPage() {
-  const { isAdmin, loading } = useAuth();
+  const { canManageUsers: isAdmin, loading } = useAuth();
   const [users, setUsers] = useState<AppUser[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [creating, setCreating] = useState(false);
   const [pwUser, setPwUser] = useState<AppUser | null>(null);
-  const [form, setForm] = useState({ nombre: "", email: "", password: "", role: "comercial" as "admin" | "comercial" });
+  const [form, setForm] = useState({ nombre: "", email: "", password: "", role: "comercial" as AppRoleOption });
   const [newPw, setNewPw] = useState("");
 
   const load = async () => {
@@ -112,7 +121,7 @@ export default function UsersPage() {
     } catch (e) { toast.error(e instanceof Error ? e.message : "Error"); }
   };
 
-  const handleRole = async (u: AppUser, role: "admin" | "comercial") => {
+  const handleRole = async (u: AppUser, role: AppRoleOption) => {
     try {
       const token = await getToken();
       if (!token) throw new Error("Sin sesión");
@@ -156,11 +165,18 @@ export default function UsersPage() {
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <Select value={u.roles.includes("admin") ? "admin" : "comercial"} onValueChange={(v) => handleRole(u, v as "admin" | "comercial")}>
-                  <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+                <Select
+                  value={(u.roles.find((r) => ROLE_OPTIONS.some((o) => o.value === r)) ?? "comercial") as AppRoleOption}
+                  onValueChange={(v) => handleRole(u, v as AppRoleOption)}
+                >
+                  <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin"><ShieldCheck className="mr-2 inline h-3 w-3" />admin</SelectItem>
-                    <SelectItem value="comercial">comercial</SelectItem>
+                    {ROLE_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.value === "super_admin" && <ShieldCheck className="mr-2 inline h-3 w-3" />}
+                        {o.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <Button size="sm" variant="outline" onClick={() => setPwUser(u)}><KeyRound className="mr-2 h-4 w-4" /> Contraseña</Button>
@@ -179,11 +195,12 @@ export default function UsersPage() {
             <div><Label>Contraseña inicial</Label><Input type="text" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></div>
             <div>
               <Label>Rol</Label>
-              <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v as "admin" | "comercial" })}>
+              <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v as AppRoleOption })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="admin">admin</SelectItem>
-                  <SelectItem value="comercial">comercial</SelectItem>
+                  {ROLE_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
