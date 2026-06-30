@@ -490,20 +490,20 @@ export default function AdminPanel() {
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
-                    <Button size="sm" variant="ghost" onClick={() => setPreviewing(r)}>
+                    <Button size="sm" variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-400" onClick={() => setPreviewing(r)}>
                       <Eye className="mr-2 h-4 w-4" /> Ver
                     </Button>
                     {!isCartera && (
                       <Link href={`/solicitar?id=${r.id}`}>
-                        <Button size="sm" variant="ghost"><Pencil className="mr-2 h-4 w-4" /> Editar</Button>
+                        <Button size="sm" variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-400"><Pencil className="mr-2 h-4 w-4" /> Editar</Button>
                       </Link>
                     )}
                     {!isCartera && canApprove && (r.status === "pendiente" || r.status === "requiere_info") && (
                       <>
-                        <Button size="sm" onClick={() => openApprove(r)}>
+                        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white border-0" onClick={() => openApprove(r)}>
                           <CheckCircle2 className="mr-2 h-4 w-4" /> Aprobar
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => {
+                        <Button size="sm" className="bg-rose-600 hover:bg-rose-700 text-white border-0" onClick={() => {
                           setRejecting(r);
                           const existing = r.rejection_reason ?? "";
                           const match = REJECT_OPTIONS.find(o => existing.startsWith(o.category));
@@ -519,6 +519,7 @@ export default function AdminPanel() {
                         }}>
                           <XCircle className="mr-2 h-4 w-4" /> Rechazar
                         </Button>
+
                       </>
                     )}
                     {(r.document_type === "orden_matricula" || r.document_type === "factura_usa") && (
@@ -537,7 +538,7 @@ export default function AdminPanel() {
                       </>
                     )}
                     {canDelete && (
-                      <Button size="sm" variant="destructive" className="ml-auto" onClick={() => removeRequest(r)}>
+                      <Button size="sm" className="ml-auto bg-red-800 hover:bg-red-900 text-white border-0" onClick={() => removeRequest(r)}>
                         <Trash2 className="mr-2 h-4 w-4" /> Eliminar
                       </Button>
                     )}
@@ -657,7 +658,7 @@ export default function AdminPanel() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setRejecting(null); setRejectCategory(""); setRejectOtherText(""); }}>Cancelar</Button>
-            <Button variant="destructive" onClick={confirmReject} disabled={!rejectCategory || (rejectCategory === "Otra razón" && !rejectOtherText.trim())}>Rechazar</Button>
+            <Button className="bg-rose-600 hover:bg-rose-700 text-white border-0" onClick={confirmReject} disabled={!rejectCategory || (rejectCategory === "Otra razón" && !rejectOtherText.trim())}>Rechazar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
