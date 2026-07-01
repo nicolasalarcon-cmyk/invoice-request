@@ -307,7 +307,9 @@ export default function MisRecibos() {
                 <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
                   {(r.status === "pendiente" || r.status === "requiere_info") && (
                     <Link href={`/solicitar?id=${r.id}`}>
-                      <Button size="sm" variant="secondary"><Pencil className="mr-2 h-4 w-4" /> Editar</Button>
+                      <Button size="sm" variant="outline" className="border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-indigo-600 hover:text-white">
+                        <Pencil className="mr-2 h-4 w-4" /> Editar
+                      </Button>
                     </Link>
                   )}
                   {r.status === "rechazada" && (
@@ -317,18 +319,18 @@ export default function MisRecibos() {
                   )}
                   {r.status === "aprobada" && (
                     <>
-                      <Button size="sm" variant="secondary" onClick={() => previewPdf(r)}>
+                      <Button size="sm" variant="outline" className="border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-blue-600 hover:text-white" onClick={() => previewPdf(r)}>
                         <Eye className="mr-2 h-4 w-4" /> Vista previa
                       </Button>
-                      <Button size="sm" onClick={() => downloadPdf(r)}>
+                      <Button size="sm" variant="outline" className="border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-blue-600 hover:text-white" onClick={() => downloadPdf(r)}>
                         <FileDown className="mr-2 h-4 w-4" /> Descargar PDF
                       </Button>
                       <Link href={`/solicitar?id=${r.id}`}>
-                        <Button size="sm" variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-400">
+                        <Button size="sm" variant="outline" className="border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-indigo-600 hover:text-white">
                           <Wrench className="mr-2 h-4 w-4" /> Corregir
                         </Button>
                       </Link>
-                      <Button size="sm" variant="outline" className="border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300" onClick={() => duplicar(r)}>
+                      <Button size="sm" variant="outline" className="border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-slate-600 hover:text-white" onClick={() => duplicar(r)}>
                         <Copy className="mr-2 h-4 w-4" /> Duplicar
                       </Button>
                     </>

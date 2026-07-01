@@ -506,14 +506,6 @@ export default function AdminPanel() {
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
-                    <Button size="sm" variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-400" onClick={() => setPreviewing(r)}>
-                      <Eye className="mr-2 h-4 w-4" /> Ver Datos
-                    </Button>
-                    {(r.document_type === "orden_matricula" || r.document_type === "factura_usa") && (
-                      <Button size="sm" variant="secondary" onClick={() => openPdfPreview(r)}>
-                        <Eye className="mr-2 h-4 w-4" /> Ver PDF
-                      </Button>
-                    )}
                     {!isCartera && canApprove && (r.status === "pendiente" || r.status === "requiere_info") && (
                       <>
                         <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white border-0" onClick={() => openApprove(r)}>
@@ -538,9 +530,17 @@ export default function AdminPanel() {
 
                       </>
                     )}
+                    {(r.document_type === "orden_matricula" || r.document_type === "factura_usa") && (
+                      <Button size="sm" variant="outline" className="border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-blue-600 hover:text-white" onClick={() => openPdfPreview(r)}>
+                        <Eye className="mr-2 h-4 w-4" /> Ver PDF
+                      </Button>
+                    )}
+                    <Button size="sm" variant="outline" className="border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-blue-600 hover:text-white" onClick={() => setPreviewing(r)}>
+                      <Eye className="mr-2 h-4 w-4" /> Ver Datos
+                    </Button>
                     {!isCartera && (
                       <Link href={`/solicitar?id=${r.id}`}>
-                        <Button size="sm" variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-400">
+                        <Button size="sm" variant="outline" className="border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-indigo-600 hover:text-white">
                           {r.status === "aprobada"
                             ? <><Wrench className="mr-2 h-4 w-4" /> Corregir</>
                             : <><Pencil className="mr-2 h-4 w-4" /> Editar</>}
@@ -548,12 +548,12 @@ export default function AdminPanel() {
                       </Link>
                     )}
                     {r.status === "aprobada" && (
-                      <Button size="sm" onClick={() => downloadPdf(r)}>
+                      <Button size="sm" variant="outline" className="border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-blue-600 hover:text-white" onClick={() => downloadPdf(r)}>
                         <FileDown className="mr-2 h-4 w-4" /> Descargar PDF
                       </Button>
                     )}
                     {!isCartera && r.status === "aprobada" && (
-                      <Button size="sm" variant="outline" className="border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300" onClick={() => duplicar(r)}>
+                      <Button size="sm" variant="outline" className="border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-slate-600 hover:text-white" onClick={() => duplicar(r)}>
                         <Copy className="mr-2 h-4 w-4" /> Duplicar
                       </Button>
                     )}
