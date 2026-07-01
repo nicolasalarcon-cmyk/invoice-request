@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import {
 import { listTemplates, type InvoiceTemplate } from "@/lib/invoice-template";
 import { useLiveRefresh } from "@/lib/use-live-refresh";
 import { deleteInvoiceFiles } from "@/lib/delete-invoice-files";
+import { cn } from "@/lib/utils";
 
 type Status = "pendiente" | "aprobada" | "rechazada" | "requiere_info";
 type DocType = "orden_matricula" | "factura_usa" | "factura_colombia" | "factura_paypal";
@@ -37,6 +38,8 @@ const REJECT_OPTIONS = [
 
 interface AttachmentItem { path: string; name: string; size: number; type: string }
 
+interface Participante { nombre: string; cedula: string; email: string; telefono: string }
+
 interface Req {
   id: string;
   status: Status;
@@ -44,9 +47,17 @@ interface Req {
   nombre: string;
   identificacion: string;
   email: string | null;
+  telefono: string | null;
+  tipo_persona: string | null;
+  empresa: string | null;
+  nit: string | null;
+  direccion: string | null;
+  ciudad: string | null;
+  pais: string | null;
   codigo_estudiante: string | null;
   programa: string;
   codigo_snies: string | null;
+  nemonico: string | null;
   periodo: string;
   cohorte: string | null;
   plan_estudio: string | null;
@@ -65,7 +76,7 @@ interface Req {
   valor_total: number;
   valor_total_empresa: number | null;
   numero_participantes: number | null;
-  participantes: { nombre: string; cedula: string; email: string; telefono: string }[] | null;
+  participantes: Participante[] | null;
   recargo_total: number;
   fecha_limite_pago: string | null;
   fecha_pago_extraordinario: string | null;
@@ -87,6 +98,13 @@ interface Req {
 
 const isUploadFlow = (r: Req | null) =>
   r?.document_type === "factura_colombia" || r?.document_type === "factura_paypal";
+
+const DOC_TYPE_LABELS: Record<string, string> = {
+  orden_matricula: "Orden de Matrícula",
+  factura_usa: "Factura USA",
+  factura_colombia: "Factura Colombia",
+  factura_paypal: "Factura PayPal",
+};
 
 async function sendInvoiceEmail(data: {
   to: string; cc?: string | null; nombre: string; recibo_numero: number | null; pdfBase64: string;
@@ -695,61 +713,152 @@ export default function AdminPanel() {
 
       {/* Ver Datos */}
       <Dialog open={!!previewing} onOpenChange={(o) => !o && setPreviewing(null)}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Detalle de la solicitud</DialogTitle></DialogHeader>
-          {previewing && (
-            <div className="grid gap-3 text-sm sm:grid-cols-2">
-              <PreviewRow label="Estudiante" value={previewing.nombre} />
-              <PreviewRow label="Identificación" value={previewing.identificacion} />
-              <PreviewRow label="Correo" value={previewing.email ?? "—"} />
-              <PreviewRow label="Concepto" value={previewing.concepto ?? "—"} />
-              <PreviewRow label="Tipo de programa" value={previewing.tipo_programa ?? "—"} />
-              <PreviewRow label="Programa" value={previewing.programa} />
-              <PreviewRow label="SNIES" value={previewing.codigo_snies ?? "—"} />
-              <PreviewRow label="Cohorte" value={previewing.cohorte ?? "—"} />
-              <PreviewRow label="Plan de estudio" value={previewing.plan_estudio ?? "—"} />
-              <PreviewRow label="Periodo" value={previewing.periodo} />
-              <PreviewRow label="Fecha inicio" value={previewing.fecha_inicio ?? "—"} />
-              <PreviewRow label="Fecha fin" value={previewing.fecha_fin ?? "—"} />
-              <PreviewRow label="Horas / duración" value={String(previewing.horas_programa ?? "—")} />
-              <PreviewRow label="Matrícula" value={formatCOP(previewing.matricula)} />
-              <PreviewRow label="Descuento %" value={`${previewing.descuento_pct}%`} />
-              <PreviewRow label="Descuento bono" value={formatCOP(previewing.descuento_bono ?? 0)} />
-              <PreviewRow label="Valor total" value={formatCOP(previewing.valor_total)} />
-              <PreviewRow label="Recargo" value={formatCOP(previewing.recargo_total)} />
-              <PreviewRow label="Límite de pago" value={previewing.fecha_limite_pago ?? "—"} />
-              <PreviewRow label="Pago extraordinario" value={previewing.fecha_pago_extraordinario ?? "—"} />
-              <PreviewRow label="N° Recibo" value={previewing.recibo_numero ? `#${previewing.recibo_numero}` : "—"} />
-              <PreviewRow label="Estado" value={previewing.status} />
-              <PreviewRow label="Comercial" value={`${previewing.comercial_nombre ?? "—"} (${previewing.comercial_email ?? "—"})`} />
-              <PreviewRow label="Creada" value={formatDate(previewing.created_at)} />
-              {previewing.observaciones && <div className="sm:col-span-2"><PreviewRow label="Observaciones" value={previewing.observaciones} /></div>}
-              {previewing.rejection_reason && <div className="sm:col-span-2"><PreviewRow label="Motivo rechazo" value={previewing.rejection_reason} /></div>}
-              {previewing.attachments && previewing.attachments.length > 0 && (
-                <div className="sm:col-span-2">
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Adjuntos del comercial</p>
-                  <ul className="mt-1 space-y-1">
-                    {previewing.attachments.map((a) => (
-                      <li key={a.path}>
-                        <button type="button" className="text-sm text-primary hover:underline" onClick={() => openAttachment(a.path)}>
-                          📎 {a.name}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+        <DialogContent className="max-w-4xl max-h-[88vh] overflow-y-auto p-0 gap-0">
+          {previewing && (() => {
+            const isPersonaFlow = previewing.document_type !== "orden_matricula";
+            const isJuridica = previewing.tipo_persona === "Persona Jurídica";
+            const participantes = previewing.participantes ?? [];
+            return (
+              <>
+                <DialogHeader className="px-6 py-4 border-b border-border">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <DialogTitle>{previewing.nombre}</DialogTitle>
+                    <StatusBadge s={previewing.status} />
+                    {previewing.recibo_numero && (
+                      <span className="text-xs font-mono text-muted-foreground">#{previewing.recibo_numero}</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {DOC_TYPE_LABELS[previewing.document_type ?? ""] ?? previewing.document_type ?? "—"}
+                  </p>
+                </DialogHeader>
+
+                <div className="space-y-6 px-6 py-5">
+                  <DetailSection title={isPersonaFlow ? "Datos del tercero" : "Datos del estudiante"}>
+                    {isPersonaFlow && (
+                      <div className="sm:col-span-2">
+                        <span className={cn(
+                          "inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold",
+                          isJuridica ? "bg-indigo-100 text-indigo-700" : "bg-teal-100 text-teal-700",
+                        )}>
+                          {previewing.tipo_persona ?? "Sin especificar"}
+                        </span>
+                      </div>
+                    )}
+                    {isPersonaFlow && isJuridica ? (
+                      <>
+                        <PreviewRow label="Empresa" value={previewing.empresa ?? previewing.nombre} />
+                        <PreviewRow label="NIT" value={previewing.nit ?? previewing.identificacion} />
+                        <PreviewRow label="País" value={previewing.pais ?? "—"} />
+                        <PreviewRow label="Ciudad" value={previewing.ciudad ?? "—"} />
+                        <div className="sm:col-span-2"><PreviewRow label="Dirección" value={previewing.direccion ?? "—"} /></div>
+                      </>
+                    ) : (
+                      <>
+                        <PreviewRow label={isPersonaFlow ? "Nombre" : "Estudiante"} value={previewing.nombre} />
+                        <PreviewRow label="Identificación" value={previewing.identificacion} />
+                        {!isPersonaFlow && <PreviewRow label="Código estudiante" value={previewing.codigo_estudiante ?? "—"} />}
+                        {!isPersonaFlow && <PreviewRow label="Tipo de financiación" value={previewing.tipo_persona ?? "—"} />}
+                      </>
+                    )}
+                    <PreviewRow label="Correo" value={previewing.email ?? "—"} />
+                    <PreviewRow label="Teléfono" value={previewing.telefono ?? "—"} />
+                  </DetailSection>
+
+                  <DetailSection title="Programa">
+                    <PreviewRow label="Concepto" value={previewing.concepto ?? "—"} />
+                    <PreviewRow label="Tipo de programa" value={previewing.tipo_programa ?? "—"} />
+                    <div className="sm:col-span-2"><PreviewRow label="Programa" value={previewing.programa} /></div>
+                    {!isPersonaFlow && <PreviewRow label="SNIES" value={previewing.codigo_snies ?? "—"} />}
+                    {isPersonaFlow && <PreviewRow label="Nemónico" value={previewing.nemonico ?? "—"} />}
+                    <PreviewRow label="Cohorte" value={previewing.cohorte ?? "—"} />
+                    <PreviewRow label="Periodo" value={previewing.periodo} />
+                    <PreviewRow label="Fecha inicio" value={previewing.fecha_inicio ?? "—"} />
+                    {previewing.fecha_fin && <PreviewRow label="Fecha fin" value={previewing.fecha_fin} />}
+                    {previewing.horas_programa != null && <PreviewRow label="Horas / duración" value={String(previewing.horas_programa)} />}
+                    {previewing.convocatoria && <PreviewRow label="Convocatoria" value={previewing.convocatoria} />}
+                  </DetailSection>
+
+                  <DetailSection title="Valores">
+                    <PreviewRow label="Matrícula" value={formatCOP(previewing.matricula)} />
+                    <PreviewRow label="Descuento %" value={`${previewing.descuento_pct}%`} />
+                    <PreviewRow label="Descuento bono" value={formatCOP(previewing.descuento_bono ?? 0)} />
+                    <PreviewRow label="Valor total" value={formatCOP(previewing.valor_total)} />
+                    {previewing.valor_total_empresa != null && (
+                      <PreviewRow label="Valor total empresa" value={formatCOP(previewing.valor_total_empresa)} />
+                    )}
+                    <PreviewRow label="Recargo" value={formatCOP(previewing.recargo_total)} />
+                    <PreviewRow label="Límite de pago" value={previewing.fecha_limite_pago ?? "—"} />
+                    <PreviewRow label="Pago extraordinario" value={previewing.fecha_pago_extraordinario ?? "—"} />
+                  </DetailSection>
+
+                  {participantes.length > 0 && (
+                    <DetailSection title={`Participantes (${participantes.length})`} noGrid>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {participantes.map((p, i) => (
+                          <div key={i} className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs space-y-0.5">
+                            <p className="font-semibold text-foreground">{i + 1}. {p.nombre || "—"}</p>
+                            {p.cedula && <p className="text-muted-foreground">ID: {p.cedula}</p>}
+                            {p.email && <p className="text-muted-foreground">{p.email}</p>}
+                            {p.telefono && <p className="text-muted-foreground">Tel: {p.telefono}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    </DetailSection>
+                  )}
+
+                  <DetailSection title="Estado y seguimiento">
+                    <PreviewRow label="Comercial" value={previewing.comercial_nombre ?? "—"} />
+                    <PreviewRow label="Correo asesor" value={previewing.comercial_email ?? "—"} />
+                    <PreviewRow label="Creada" value={formatDate(previewing.created_at)} />
+                    {previewing.approved_at && <PreviewRow label="Aprobada" value={formatDate(previewing.approved_at)} />}
+                    {previewing.observaciones && (
+                      <div className="sm:col-span-2">
+                        <p className="text-xs uppercase tracking-wider text-muted-foreground">Observaciones</p>
+                        <p className="mt-0.5 text-foreground">{previewing.observaciones}</p>
+                      </div>
+                    )}
+                    {previewing.rejection_reason && (
+                      <div className="sm:col-span-2 rounded-lg bg-destructive/10 px-3 py-2">
+                        <p className="text-xs uppercase tracking-wider text-destructive">Motivo de rechazo</p>
+                        <p className="mt-0.5 text-destructive">{previewing.rejection_reason}</p>
+                      </div>
+                    )}
+                  </DetailSection>
+
+                  {((previewing.attachments && previewing.attachments.length > 0) || previewing.approved_pdf_path) && (
+                    <DetailSection title="Adjuntos" noGrid>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {previewing.attachments?.map((a) => (
+                          <button
+                            key={a.path}
+                            type="button"
+                            onClick={() => openAttachment(a.path)}
+                            className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-left text-xs hover:bg-muted/60 transition-colors"
+                          >
+                            <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            <span className="min-w-0 flex-1 truncate font-medium text-foreground">{a.name}</span>
+                            <span className="shrink-0 text-muted-foreground">{(a.size / 1024).toFixed(0)} KB</span>
+                          </button>
+                        ))}
+                        {previewing.approved_pdf_path && (
+                          <button
+                            type="button"
+                            onClick={() => openAttachment(previewing.approved_pdf_path!)}
+                            className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-left text-xs hover:bg-blue-100 transition-colors"
+                          >
+                            <FileDown className="h-4 w-4 shrink-0 text-blue-700" />
+                            <span className="min-w-0 flex-1 truncate font-medium text-blue-700">PDF oficial aprobado</span>
+                          </button>
+                        )}
+                      </div>
+                    </DetailSection>
+                  )}
                 </div>
-              )}
-              {previewing.approved_pdf_path && (
-                <div className="sm:col-span-2">
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground">PDF oficial aprobado</p>
-                  <button type="button" className="mt-1 text-sm text-primary hover:underline" onClick={() => openAttachment(previewing.approved_pdf_path!)}>
-                    📄 Ver PDF aprobado
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-          <DialogFooter>
+              </>
+            );
+          })()}
+          <DialogFooter className="px-6 py-3 border-t border-border">
             <Button variant="outline" onClick={() => setPreviewing(null)}>Cerrar</Button>
           </DialogFooter>
         </DialogContent>
@@ -784,6 +893,17 @@ export default function AdminPanel() {
         </DialogContent>
       </Dialog>
     </main>
+  );
+}
+
+function DetailSection({ title, children, noGrid }: { title: string; children: ReactNode; noGrid?: boolean }) {
+  return (
+    <div>
+      <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border pb-1.5 mb-3">
+        {title}
+      </h3>
+      {noGrid ? children : <div className="grid gap-3 text-sm sm:grid-cols-2">{children}</div>}
+    </div>
   );
 }
 
