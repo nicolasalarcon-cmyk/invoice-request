@@ -161,6 +161,14 @@ export default function AdminPanel() {
     return out;
   }, [items]);
 
+  const itemsById = useMemo(() => new Map(items.map((r) => [r.id, r])), [items]);
+
+  const isCorrectionOfApproved = (r: Req) => {
+    if (!r.parent_id) return false;
+    const parent = itemsById.get(r.parent_id);
+    return !!parent?.rejection_reason?.startsWith("Corrección solicitada tras aprobación");
+  };
+
   const filtered = useMemo(() => {
     const s = q.toLowerCase().trim();
     const fromTs = dateFrom ? new Date(dateFrom).getTime() : 0;
@@ -467,7 +475,11 @@ export default function AdminPanel() {
                         </button>
                         <StatusBadge s={r.status} />
                         {r.recibo_numero && <span className="text-xs font-mono text-muted-foreground">#{r.recibo_numero}</span>}
-                        {r.parent_id && <Badge variant="outline" className="text-xs">Relanzada</Badge>}
+                        {r.parent_id && (
+                          isCorrectionOfApproved(r)
+                            ? <Badge className="text-xs bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100">Corrección solicitada</Badge>
+                            : <Badge variant="outline" className="text-xs">Relanzada</Badge>
+                        )}
                         {alertN && alertN >= 2 && (
                           <Badge variant="destructive" className="gap-1" title={`${alertN} facturas con esta cédula en los últimos 7 días`}>
                             <AlertTriangle className="h-3 w-3" /> {alertN} en 7 días
