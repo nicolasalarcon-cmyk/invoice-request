@@ -244,16 +244,33 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
         attachments,
       };
 
-      if (editId) {
+      if (editId && originalStatus === "rechazada" && !isAdmin) {
+        // Corregir y reenviar una rechazada: se crea una solicitud nueva enlazada
+        // a la original, que queda intacta (con su motivo de rechazo) para el histórico.
+        const { error: insErr } = await supabase.from("invoice_requests").insert({
+          ...payload,
+          created_by: user.id,
+          comercial_nombre: profile?.nombre_completo ?? null,
+          comercial_email: profile?.email ?? user.email ?? null,
+          status: "pendiente",
+          parent_id: editId,
+        });
+        if (insErr) throw insErr;
+        const { error: archErr } = await supabase
+          .from("invoice_requests")
+          .update({ archived_by_comercial: true })
+          .eq("id", editId);
+        if (archErr) throw archErr;
+        toast.success("Solicitud corregida y reenviada");
+        router.push(canViewAllRequests ? "/admin" : "/mis-recibos");
+      } else if (editId) {
         const next = { ...payload } as typeof payload & {
           status?: "pendiente";
           info_requested?: null;
-          rejection_reason?: null;
         };
-        if ((originalStatus === "requiere_info" || originalStatus === "rechazada") && !isAdmin) {
+        if (originalStatus === "requiere_info" && !isAdmin) {
           next.status = "pendiente";
           next.info_requested = null;
-          next.rejection_reason = null;
         }
         const { error } = await supabase.from("invoice_requests").update(next).eq("id", editId);
         if (error) throw error;

@@ -80,6 +80,7 @@ interface Req {
   parent_id: string | null;
   attachments: AttachmentItem[] | null;
   approved_pdf_path: string | null;
+  archived_by_comercial: boolean;
 }
 
 const isUploadFlow = (r: Req | null) =>
@@ -155,6 +156,7 @@ export default function AdminPanel() {
     const byCed = new Map<string, Req[]>();
     const weekAgo = Date.now() - 7 * 86400000;
     items.forEach((r) => {
+      if (r.archived_by_comercial) return;
       if (new Date(r.created_at).getTime() < weekAgo) return;
       const arr = byCed.get(r.identificacion) ?? [];
       arr.push(r);

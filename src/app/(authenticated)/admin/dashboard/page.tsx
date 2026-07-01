@@ -23,6 +23,7 @@ interface Row {
   document_type: string | null;
   valor_total: number;
   created_at: string;
+  rejection_reason: string | null;
 }
 
 const STATUS_META: Record<string, { label: string; color: string; bg: string; text: string }> = {
@@ -74,7 +75,7 @@ export default function Dashboard() {
     (async () => {
       const { data } = await supabase
         .from("invoice_requests")
-        .select("status,comercial_nombre,nombre,identificacion,recibo_numero,programa,periodo,document_type,valor_total,created_at");
+        .select("status,comercial_nombre,nombre,identificacion,recibo_numero,programa,periodo,document_type,valor_total,created_at,rejection_reason");
       setRows((data ?? []) as Row[]);
       setLoading(false);
     })();
@@ -99,7 +100,7 @@ export default function Dashboard() {
     });
   }, [rows, q, statusSel, docSel, desde, hasta]);
 
-  const { byStatus, byDocType, byComercial, timeline, totales } = useMemo(() => {
+  const { byStatus, byDocType, byComercial, byRejectReason, byComercialRejected, timeline, totales } = useMemo(() => {
     const statusMap = new Map<string, number>();
     filtered.forEach((r) => statusMap.set(r.status, (statusMap.get(r.status) ?? 0) + 1));
     const byStatus = Array.from(statusMap, ([name, value]) => ({ name, value }));
@@ -135,7 +136,26 @@ export default function Dashboard() {
       rechazadas: filtered.filter((r) => r.status === "rechazada").length,
     };
 
-    return { byStatus, byDocType, byComercial, timeline, totales };
+    const rejected = filtered.filter((r) => r.status === "rechazada");
+
+    const reasonMap = new Map<string, number>();
+    rejected.forEach((r) => {
+      const k = (r.rejection_reason ?? "Sin motivo").split(" — ")[0];
+      reasonMap.set(k, (reasonMap.get(k) ?? 0) + 1);
+    });
+    const byRejectReason = Array.from(reasonMap, ([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+
+    const comRejMap = new Map<string, number>();
+    rejected.forEach((r) => {
+      const k = r.comercial_nombre ?? "Sin asignar";
+      comRejMap.set(k, (comRejMap.get(k) ?? 0) + 1);
+    });
+    const byComercialRejected = Array.from(comRejMap, ([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 8);
+
+    return { byStatus, byDocType, byComercial, byRejectReason, byComercialRejected, timeline, totales };
   }, [filtered]);
 
   const toggle = (arr: string[], setArr: (v: string[]) => void, v: string) =>
@@ -340,6 +360,40 @@ export default function Dashboard() {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+        </ChartCard>
+
+        <ChartCard title="Rechazos por motivo" subtitle={`${totales.rechazadas} solicitud(es) rechazada(s)`}>
+          {byRejectReason.length === 0 ? (
+            <p className="flex h-[280px] items-center justify-center text-sm text-muted-foreground">Sin rechazos en este filtro.</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={byRejectReason} layout="vertical" margin={{ top: 5, right: 16, left: 8, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                <XAxis type="number" allowDecimals={false} fontSize={10} tick={{ fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                <YAxis type="category" dataKey="name" width={140} fontSize={10} tick={{ fill: "#64748b" }} axisLine={false} tickLine={false}
+                  tickFormatter={(v: string) => v.length > 22 ? v.slice(0, 21) + "…" : v} />
+                <Tooltip content={<ChartTooltip />} />
+                <Bar dataKey="value" fill="#EF4444" radius={[0, 6, 6, 0]} maxBarSize={22} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </ChartCard>
+
+        <ChartCard title="Rechazos por comercial" subtitle="Quién acumula más solicitudes rechazadas">
+          {byComercialRejected.length === 0 ? (
+            <p className="flex h-[280px] items-center justify-center text-sm text-muted-foreground">Sin rechazos en este filtro.</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={byComercialRejected} layout="vertical" margin={{ top: 5, right: 16, left: 8, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                <XAxis type="number" allowDecimals={false} fontSize={10} tick={{ fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                <YAxis type="category" dataKey="name" width={96} fontSize={10} tick={{ fill: "#64748b" }} axisLine={false} tickLine={false}
+                  tickFormatter={(v: string) => v.length > 14 ? v.slice(0, 13) + "…" : v} />
+                <Tooltip content={<ChartTooltip />} />
+                <Bar dataKey="value" fill="#EF4444" radius={[0, 6, 6, 0]} maxBarSize={22} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </ChartCard>
       </div>
     </main>

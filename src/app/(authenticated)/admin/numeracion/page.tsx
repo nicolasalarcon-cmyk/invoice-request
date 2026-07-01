@@ -47,6 +47,7 @@ interface Row {
   valor_total: number;
   valor_total_empresa: number | null;
   observaciones: string | null;
+  rejection_reason: string | null;
   comercial_nombre: string | null;
   comercial_email: string | null;
   approved_at: string | null;
@@ -96,7 +97,7 @@ export default function Numeracion() {
         programa,concepto,tipo_programa,cohorte,fecha_inicio,fecha_limite_pago,
         pais,direccion,ciudad,numero_participantes,
         descuento_pct,descuento,valor_total,valor_total_empresa,
-        observaciones,comercial_nombre,comercial_email,
+        observaciones,rejection_reason,comercial_nombre,comercial_email,
         approved_at,approved_pdf_path,attachments,participantes
       `)
       .order("created_at", { ascending: false });
@@ -194,6 +195,7 @@ export default function Numeracion() {
       "Asesor":               r.comercial_nombre ?? "",
       "Email asesor":         r.comercial_email ?? "",
       "Observaciones":        r.observaciones ?? "",
+      "Motivo de rechazo":    r.rejection_reason ?? "",
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
@@ -353,6 +355,13 @@ export default function Numeracion() {
                               <div className="space-y-0.5 sm:col-span-2 lg:col-span-3 xl:col-span-4">
                                 <p className="text-[10px] font-semibold uppercase text-muted-foreground">Observaciones</p>
                                 <p className="text-sm">{r.observaciones}</p>
+                              </div>
+                            )}
+
+                            {r.status === "rechazada" && r.rejection_reason && (
+                              <div className="space-y-0.5 sm:col-span-2 lg:col-span-3 xl:col-span-4">
+                                <p className="text-[10px] font-semibold uppercase text-red-700">Motivo de rechazo</p>
+                                <p className="text-sm text-red-700">{r.rejection_reason}</p>
                               </div>
                             )}
 
