@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { formatCOP, formatDate } from "@/lib/format";
-import { FileDown, FilePlus, Inbox, MessageSquare, Search, Pencil, Archive, Eye } from "lucide-react";
+import { FileDown, FilePlus, Inbox, MessageSquare, Search, Pencil, Trash2, Copy, Wrench, Eye } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 type Status = "pendiente" | "aprobada" | "rechazada" | "requiere_info";
@@ -201,11 +201,15 @@ export default function MisRecibos() {
   };
 
   const archiveRequest = async (r: Req) => {
-    if (!confirm(`¿Quitar el recibo de ${r.nombre} de tu lista? Seguirá disponible en el histórico de la plataforma.`)) return;
+    if (!confirm(`¿Eliminar el recibo de ${r.nombre}? Esta acción no se puede deshacer.`)) return;
     const { error } = await supabase.from("invoice_requests").update({ archived_by_comercial: true }).eq("id", r.id);
     if (error) { toast.error(error.message); return; }
     setItems((prev) => prev.filter((x) => x.id !== r.id));
-    toast.success("Recibo quitado de tu lista");
+    toast.success("Recibo eliminado");
+  };
+
+  const duplicar = (r: Req) => {
+    window.location.href = `/solicitar?duplicar=${r.id}`;
   };
 
   return (
@@ -319,11 +323,19 @@ export default function MisRecibos() {
                       <Button size="sm" onClick={() => downloadPdf(r)}>
                         <FileDown className="mr-2 h-4 w-4" /> Descargar PDF
                       </Button>
+                      <Link href={`/solicitar?id=${r.id}`}>
+                        <Button size="sm" variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-400">
+                          <Wrench className="mr-2 h-4 w-4" /> Corregir
+                        </Button>
+                      </Link>
+                      <Button size="sm" variant="outline" className="border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300" onClick={() => duplicar(r)}>
+                        <Copy className="mr-2 h-4 w-4" /> Duplicar
+                      </Button>
                     </>
                   )}
                   {(r.status === "aprobada" || r.status === "rechazada") && (
-                    <Button size="sm" variant="outline" onClick={() => archiveRequest(r)}>
-                      <Archive className="mr-2 h-4 w-4" /> Quitar de mi lista
+                    <Button size="sm" variant="destructive" className="ml-auto" onClick={() => archiveRequest(r)}>
+                      <Trash2 className="mr-2 h-4 w-4" /> Eliminar
                     </Button>
                   )}
                 </div>

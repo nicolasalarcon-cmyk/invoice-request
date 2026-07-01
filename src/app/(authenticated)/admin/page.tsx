@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { formatCOP, formatDate } from "@/lib/format";
 import {
   AlertTriangle, CheckCircle2, XCircle, FileDown, Inbox, Search, Pencil,
-  FileText, Trash2, Eye, Copy, BookOpen,
+  FileText, Trash2, Eye, Copy, BookOpen, Wrench,
 } from "lucide-react";
 import { listTemplates, type InvoiceTemplate } from "@/lib/invoice-template";
 
@@ -71,6 +71,7 @@ interface Req {
   recibo_fecha: string;
   approved_at: string | null;
   created_at: string;
+  updated_at: string;
   rejection_reason: string | null;
   info_requested: string | null;
   comercial_nombre: string | null;
@@ -205,9 +206,21 @@ export default function AdminPanel() {
     setSelectedTemplate(r.template_id ?? matchTipo?.id ?? matchAny?.id ?? templates[0]?.id ?? "");
   };
 
+  const assertNotStale = async (r: Req) => {
+    const { data, error } = await supabase.from("invoice_requests").select("updated_at").eq("id", r.id).single();
+    if (error) { toast.error(error.message); return false; }
+    if (data.updated_at !== r.updated_at) {
+      toast.error("Esta solicitud se modificó mientras la revisabas. Actualiza los datos antes de continuar.");
+      load();
+      return false;
+    }
+    return true;
+  };
+
   const confirmApproveUpload = async () => {
     if (!approving) return;
     const r = approving;
+    if (!(await assertNotStale(r))) return;
     try {
       let pdfPath: string | null = null;
       if (approvalPdf) {
@@ -245,6 +258,7 @@ export default function AdminPanel() {
   const confirmApprove = async () => {
     if (!approving) return;
     const r = approving;
+    if (!(await assertNotStale(r))) return;
     const tpl = templates.find((t) => t.id === selectedTemplate);
     const user = (await supabase.auth.getUser()).data.user;
     const reciboNumero = r.recibo_numero ?? Date.now() % 100000000;
@@ -297,6 +311,7 @@ export default function AdminPanel() {
     if (rejectCategory === "Otra razón" && !rejectOtherText.trim()) {
       toast.error("Describe el motivo específico."); return;
     }
+    if (!(await assertNotStale(rejecting))) return;
     const opt = REJECT_OPTIONS.find(o => o.category === rejectCategory);
     const reason = rejectCategory === "Otra razón"
       ? `Otra razón — ${rejectOtherText.trim()}`
@@ -383,7 +398,8 @@ export default function AdminPanel() {
       const { getInvoicePdfDataUrl } = await import("@/lib/generate-invoice-pdf");
       const url = await getInvoicePdfDataUrl(reqToPdfData(r));
       setPdfPreviewUrl(url);
-    } catch {
+    } catch (err) {
+      console.error("Error generando vista previa PDF:", err);
       toast.error("No se pudo generar la vista previa");
       setPdfPreviewOpen(false);
     } finally {
@@ -491,12 +507,12 @@ export default function AdminPanel() {
 
                   <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
                     <Button size="sm" variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-400" onClick={() => setPreviewing(r)}>
-                      <Eye className="mr-2 h-4 w-4" /> Ver
+                      <Eye className="mr-2 h-4 w-4" /> Ver Datos
                     </Button>
-                    {!isCartera && (
-                      <Link href={`/solicitar?id=${r.id}`}>
-                        <Button size="sm" variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-400"><Pencil className="mr-2 h-4 w-4" /> Editar</Button>
-                      </Link>
+                    {(r.document_type === "orden_matricula" || r.document_type === "factura_usa") && (
+                      <Button size="sm" variant="secondary" onClick={() => openPdfPreview(r)}>
+                        <Eye className="mr-2 h-4 w-4" /> Ver PDF
+                      </Button>
                     )}
                     {!isCartera && canApprove && (r.status === "pendiente" || r.status === "requiere_info") && (
                       <>
@@ -522,10 +538,14 @@ export default function AdminPanel() {
 
                       </>
                     )}
-                    {(r.document_type === "orden_matricula" || r.document_type === "factura_usa") && (
-                      <Button size="sm" variant="secondary" onClick={() => openPdfPreview(r)}>
-                        <Eye className="mr-2 h-4 w-4" /> Vista previa PDF
-                      </Button>
+                    {!isCartera && (
+                      <Link href={`/solicitar?id=${r.id}`}>
+                        <Button size="sm" variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-400">
+                          {r.status === "aprobada"
+                            ? <><Wrench className="mr-2 h-4 w-4" /> Corregir</>
+                            : <><Pencil className="mr-2 h-4 w-4" /> Editar</>}
+                        </Button>
+                      </Link>
                     )}
                     {r.status === "aprobada" && (
                       <Button size="sm" onClick={() => downloadPdf(r)}>
@@ -533,7 +553,7 @@ export default function AdminPanel() {
                       </Button>
                     )}
                     {!isCartera && r.status === "aprobada" && (
-                      <Button size="sm" variant="secondary" onClick={() => duplicar(r)}>
+                      <Button size="sm" variant="outline" className="border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300" onClick={() => duplicar(r)}>
                         <Copy className="mr-2 h-4 w-4" /> Duplicar
                       </Button>
                     )}
@@ -663,7 +683,7 @@ export default function AdminPanel() {
         </DialogContent>
       </Dialog>
 
-      {/* Vista previa */}
+      {/* Ver Datos */}
       <Dialog open={!!previewing} onOpenChange={(o) => !o && setPreviewing(null)}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Detalle de la solicitud</DialogTitle></DialogHeader>
@@ -725,12 +745,12 @@ export default function AdminPanel() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog: Vista previa PDF */}
+      {/* Dialog: Ver PDF */}
       <Dialog open={pdfPreviewOpen} onOpenChange={(o) => { if (!o) { setPdfPreviewOpen(false); setPdfPreviewUrl(null); } }}>
         <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 gap-0">
           <DialogHeader className="px-6 py-4 border-b border-border shrink-0">
             <DialogTitle className="flex items-center gap-2">
-              <Eye className="h-4 w-4" /> Vista previa — {pdfPreviewName}
+              <Eye className="h-4 w-4" /> Ver PDF — {pdfPreviewName}
             </DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-hidden">
@@ -740,7 +760,7 @@ export default function AdminPanel() {
                 Generando vista previa…
               </div>
             ) : pdfPreviewUrl ? (
-              <iframe src={pdfPreviewUrl} title="Vista previa PDF" className="h-full w-full border-0" />
+              <iframe src={pdfPreviewUrl} title="Ver PDF" className="h-full w-full border-0" />
             ) : null}
           </div>
           <DialogFooter className="px-6 py-3 border-t border-border shrink-0">

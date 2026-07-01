@@ -23,7 +23,10 @@ export default function LoginPage() {
       .select("role")
       .eq("user_id", u.user.id);
     const list = (roles ?? []).map((r) => r.role as string);
-    if (list.includes("admin")) router.replace("/admin");
+    const canViewAllRequests = list.some((r) =>
+      ["super_admin", "admin", "financiera", "cartera"].includes(r),
+    );
+    if (canViewAllRequests) router.replace("/admin");
     else router.replace("/mis-recibos");
   };
 
