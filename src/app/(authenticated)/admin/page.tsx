@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { listTemplates, type InvoiceTemplate } from "@/lib/invoice-template";
 import { useLiveRefresh } from "@/lib/use-live-refresh";
+import { deleteInvoiceFiles } from "@/lib/delete-invoice-files";
 
 type Status = "pendiente" | "aprobada" | "rechazada" | "requiere_info";
 type DocType = "orden_matricula" | "factura_usa" | "factura_colombia" | "factura_paypal";
@@ -333,7 +334,8 @@ export default function AdminPanel() {
   };
 
   const removeRequest = async (r: Req) => {
-    if (!confirm(`¿Eliminar definitivamente la factura de ${r.nombre}${r.recibo_numero ? ` (#${r.recibo_numero})` : ""}?`)) return;
+    if (!confirm(`¿Eliminar definitivamente la factura de ${r.nombre}${r.recibo_numero ? ` (#${r.recibo_numero})` : ""}? Esto también borrará los archivos adjuntos.`)) return;
+    await deleteInvoiceFiles(r.attachments, r.approved_pdf_path);
     const { error } = await supabase.from("invoice_requests").delete().eq("id", r.id);
     if (error) return toast.error(error.message);
     toast.success("Factura eliminada");

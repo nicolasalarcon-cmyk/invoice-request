@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { useLiveRefresh } from "@/lib/use-live-refresh";
+import { deleteInvoiceFiles } from "@/lib/delete-invoice-files";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatCOP, formatDate } from "@/lib/format";
@@ -171,7 +172,8 @@ export default function Numeracion() {
   }), [filtered]);
 
   const removeRow = async (r: Row) => {
-    if (!confirm(`¿Eliminar definitivamente el registro de ${r.nombre}${r.recibo_numero ? ` (#${r.recibo_numero})` : ""}?`)) return;
+    if (!confirm(`¿Eliminar definitivamente el registro de ${r.nombre}${r.recibo_numero ? ` (#${r.recibo_numero})` : ""}? Esto también borrará los archivos adjuntos.`)) return;
+    await deleteInvoiceFiles(r.attachments, r.approved_pdf_path);
     const { error } = await supabase.from("invoice_requests").delete().eq("id", r.id);
     if (error) return toast.error(error.message);
     setRows((prev) => prev.filter((x) => x.id !== r.id));
