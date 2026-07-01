@@ -28,6 +28,18 @@ interface Row {
   created_at: string;
   nombre: string;
   identificacion: string;
+  codigo_estudiante: string | null;
+  codigo_snies: string | null;
+  periodo: string | null;
+  plan_estudio: string | null;
+  horas_programa: number | null;
+  duracion: string | null;
+  convocatoria: string | null;
+  descuento_bono: number | null;
+  recargo_total: number | null;
+  fecha_pago_extraordinario: string | null;
+  template_id: string | null;
+  nemonico: string | null;
   email: string | null;
   telefono: string | null;
   empresa: string | null;
@@ -43,6 +55,7 @@ interface Row {
   direccion: string | null;
   ciudad: string | null;
   numero_participantes: number | null;
+  matricula: number;
   descuento_pct: number;
   descuento: number;
   valor_total: number;
@@ -94,9 +107,12 @@ export default function Numeracion() {
       .from("invoice_requests")
       .select(`
         id,document_type,status,recibo_numero,recibo_fecha,created_at,
-        nombre,identificacion,email,telefono,empresa,nit,tipo_persona,
+        nombre,identificacion,codigo_estudiante,codigo_snies,periodo,
+        plan_estudio,horas_programa,duracion,convocatoria,descuento_bono,
+        recargo_total,fecha_pago_extraordinario,template_id,nemonico,
+        email,telefono,empresa,nit,tipo_persona,
         programa,concepto,tipo_programa,cohorte,fecha_inicio,fecha_limite_pago,
-        pais,direccion,ciudad,numero_participantes,
+        pais,direccion,ciudad,numero_participantes,matricula,
         descuento_pct,descuento,valor_total,valor_total_empresa,
         observaciones,rejection_reason,comercial_nombre,comercial_email,
         approved_at,approved_pdf_path,attachments,participantes
@@ -165,6 +181,36 @@ export default function Numeracion() {
     const { data, error } = await supabase.storage.from("invoice-files").createSignedUrl(path, 60);
     if (error || !data) return toast.error("No se pudo abrir el archivo");
     window.open(data.signedUrl, "_blank");
+  };
+
+  const rowToPdfData = (r: Row) => ({
+    recibo_numero: r.recibo_numero, recibo_fecha: r.recibo_fecha, nombre: r.nombre,
+    identificacion: r.identificacion, codigo_estudiante: r.codigo_estudiante,
+    programa: r.programa ?? "", codigo_snies: r.codigo_snies, periodo: r.periodo ?? "",
+    cohorte: r.cohorte, plan_estudio: r.plan_estudio, fecha_inicio: r.fecha_inicio,
+    horas_programa: r.horas_programa, duracion: r.duracion, convocatoria: r.convocatoria,
+    matricula: Number(r.matricula), descuento_pct: Number(r.descuento_pct ?? 0),
+    descuento_bono: Number(r.descuento_bono ?? 0), valor_total: Number(r.valor_total ?? 0),
+    valor_total_empresa: r.valor_total_empresa ? Number(r.valor_total_empresa) : null,
+    numero_participantes: r.numero_participantes,
+    participantes: r.participantes,
+    recargo_total: Number(r.recargo_total ?? 0), fecha_limite_pago: r.fecha_limite_pago,
+    fecha_pago_extraordinario: r.fecha_pago_extraordinario, template_id: r.template_id,
+    tipo_programa: r.tipo_programa, document_type: r.document_type,
+    empresa: r.empresa, cliente_nit: r.nit, direccion: r.direccion,
+    ciudad: r.ciudad, telefono: r.telefono, pais: r.pais,
+    email: r.email, nemonico: r.nemonico, observaciones: r.observaciones,
+    concepto: r.concepto,
+  });
+
+  const downloadInvoice = async (r: Row) => {
+    if (r.approved_pdf_path) return openFile(r.approved_pdf_path);
+    try {
+      const { generateInvoicePDF } = await import("@/lib/generate-invoice-pdf");
+      await generateInvoicePDF(rowToPdfData(r));
+    } catch {
+      toast.error("No se pudo generar el documento");
+    }
   };
 
   const exportXLSX = () => {
@@ -317,8 +363,8 @@ export default function Numeracion() {
                       <td className="px-3 py-2 text-xs max-w-[120px] truncate">{r.comercial_nombre ?? "—"}</td>
                       <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
-                          {r.approved_pdf_path && (
-                            <Button size="sm" variant="ghost" title="Descargar factura aprobada" onClick={() => openFile(r.approved_pdf_path!)}>
+                          {r.status === "aprobada" && (
+                            <Button size="sm" variant="ghost" title="Descargar factura aprobada" onClick={() => downloadInvoice(r)}>
                               <Download className="h-4 w-4" />
                             </Button>
                           )}
