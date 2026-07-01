@@ -123,8 +123,8 @@ export default function AdminPanel() {
   const [pdfPreviewLoading, setPdfPreviewLoading] = useState(false);
   const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
     const [{ data, error }, tpls] = await Promise.all([
       supabase.from("invoice_requests").select("*").order("created_at", { ascending: false }),
       listTemplates(),
@@ -137,7 +137,7 @@ export default function AdminPanel() {
 
   useEffect(() => { if (canViewAllRequests) load(); }, [canViewAllRequests]);
 
-  useLiveRefresh("invoice_requests_inbox", load, canViewAllRequests);
+  useLiveRefresh("invoice_requests_inbox", () => load(true), canViewAllRequests);
 
   const tipos: { value: string; label: string }[] = [
     { value: "orden_matricula", label: "Orden de Matrícula" },
@@ -413,7 +413,7 @@ export default function AdminPanel() {
         <div className="flex items-center gap-2">
           <Link href="/admin/programas"><Button variant="outline" size="sm"><BookOpen className="mr-2 h-4 w-4" /> Programas</Button></Link>
           <Link href="/admin/numeracion"><Button variant="outline" size="sm"><FileText className="mr-2 h-4 w-4" /> Numeración</Button></Link>
-          <Button variant="outline" size="sm" onClick={load}>Actualizar</Button>
+          <Button variant="outline" size="sm" onClick={() => load()}>Actualizar</Button>
         </div>
       </div>
 

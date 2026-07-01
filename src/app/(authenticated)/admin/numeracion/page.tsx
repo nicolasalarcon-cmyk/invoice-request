@@ -88,8 +88,8 @@ export default function Numeracion() {
   const [expandedId, setExpandedId]         = useState<string | null>(null);
   const [showParticipants, setShowParticipants] = useState<string | null>(null);
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
     const { data, error } = await supabase
       .from("invoice_requests")
       .select(`
@@ -109,7 +109,7 @@ export default function Numeracion() {
 
   useEffect(() => { if (isAdmin) load(); }, [isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useLiveRefresh("numeracion_inbox", load, isAdmin);
+  useLiveRefresh("numeracion_inbox", () => load(true), isAdmin);
 
   const filtered = useMemo(() => {
     let list = rows;
