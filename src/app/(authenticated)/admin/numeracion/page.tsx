@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
+import { useLiveRefresh } from "@/lib/use-live-refresh";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatCOP, formatDate } from "@/lib/format";
@@ -107,6 +108,8 @@ export default function Numeracion() {
   };
 
   useEffect(() => { if (isAdmin) load(); }, [isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useLiveRefresh("numeracion_inbox", load, isAdmin);
 
   const filtered = useMemo(() => {
     let list = rows;

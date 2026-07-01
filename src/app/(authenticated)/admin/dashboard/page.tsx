@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
+import { useLiveRefresh } from "@/lib/use-live-refresh";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -70,16 +71,17 @@ export default function Dashboard() {
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
 
-  useEffect(() => {
-    if (!isAdmin) return;
-    (async () => {
-      const { data } = await supabase
-        .from("invoice_requests")
-        .select("status,comercial_nombre,nombre,identificacion,recibo_numero,programa,periodo,document_type,valor_total,created_at,rejection_reason");
-      setRows((data ?? []) as Row[]);
-      setLoading(false);
-    })();
-  }, [isAdmin]);
+  const load = async () => {
+    const { data } = await supabase
+      .from("invoice_requests")
+      .select("status,comercial_nombre,nombre,identificacion,recibo_numero,programa,periodo,document_type,valor_total,created_at,rejection_reason");
+    setRows((data ?? []) as Row[]);
+    setLoading(false);
+  };
+
+  useEffect(() => { if (isAdmin) load(); }, [isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useLiveRefresh("dashboard_inbox", load, isAdmin);
 
   const DOC_TYPES = ["orden_matricula", "factura_usa", "factura_colombia", "factura_paypal"] as const;
 

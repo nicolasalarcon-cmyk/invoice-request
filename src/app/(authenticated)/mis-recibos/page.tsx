@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
+import { useLiveRefresh } from "@/lib/use-live-refresh";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -63,20 +64,22 @@ export default function MisRecibos() {
   const [statusFilter, setStatusFilter] = useState<"all" | Status>("all");
   const [tipoFilter, setTipoFilter] = useState<string>("all");
 
-  useEffect(() => {
+  const load = async () => {
     if (!user) return;
-    (async () => {
-      const { data, error } = await supabase
-        .from("invoice_requests")
-        .select("*")
-        .eq("created_by", user.id)
-        .eq("archived_by_comercial", false)
-        .order("created_at", { ascending: false });
-      if (error) toast.error(error.message);
-      else setItems((data ?? []) as unknown as Req[]);
-      setLoading(false);
-    })();
-  }, [user]);
+    const { data, error } = await supabase
+      .from("invoice_requests")
+      .select("*")
+      .eq("created_by", user.id)
+      .eq("archived_by_comercial", false)
+      .order("created_at", { ascending: false });
+    if (error) toast.error(error.message);
+    else setItems((data ?? []) as unknown as Req[]);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useLiveRefresh("mis_recibos_inbox", load, !!user);
 
   const tipos = useMemo(() => {
     const s = new Set<string>();

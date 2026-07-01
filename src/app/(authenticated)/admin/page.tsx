@@ -19,6 +19,7 @@ import {
   FileText, Trash2, Eye, Copy, BookOpen, Wrench,
 } from "lucide-react";
 import { listTemplates, type InvoiceTemplate } from "@/lib/invoice-template";
+import { useLiveRefresh } from "@/lib/use-live-refresh";
 
 type Status = "pendiente" | "aprobada" | "rechazada" | "requiere_info";
 type DocType = "orden_matricula" | "factura_usa" | "factura_colombia" | "factura_paypal";
@@ -101,7 +102,7 @@ async function sendInvoiceEmail(data: {
 }
 
 export default function AdminPanel() {
-  const { isAdmin, isCartera, canApprove, canDelete, canViewAllRequests, loading: authLoading } = useAuth();
+  const { isCartera, canApprove, canDelete, canViewAllRequests, loading: authLoading } = useAuth();
   const [items, setItems] = useState<Req[]>([]);
   const [templates, setTemplates] = useState<InvoiceTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -136,14 +137,7 @@ export default function AdminPanel() {
 
   useEffect(() => { if (canViewAllRequests) load(); }, [canViewAllRequests]);
 
-  useEffect(() => {
-    if (!canViewAllRequests) return;
-    const channel = supabase
-      .channel("invoice_requests_inbox")
-      .on("postgres_changes", { event: "*", schema: "public", table: "invoice_requests" }, () => load())
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [isAdmin]);
+  useLiveRefresh("invoice_requests_inbox", load, canViewAllRequests);
 
   const tipos: { value: string; label: string }[] = [
     { value: "orden_matricula", label: "Orden de Matrícula" },
