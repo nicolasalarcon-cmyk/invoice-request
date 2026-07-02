@@ -16,54 +16,50 @@ async function getAdminUser(request: NextRequest) {
   return user;
 }
 
-const GATEWAY = "https://connector-gateway.lovable.dev/google_mail/gmail/v1";
-
-function b64url(input: string | Uint8Array): string {
-  const bytes = typeof input === "string" ? new TextEncoder().encode(input) : input;
-  let bin = "";
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-function encodeSubject(s: string): string {
-  if (/^[\x00-\x7F]*$/.test(s)) return s;
-  const b = btoa(unescape(encodeURIComponent(s)));
-  return `=?UTF-8?B?${b}?=`;
-}
-
-async function sendGmail({ to, subject, html, attachment }: {
+async function sendMailjet({ to, subject, html, attachment }: {
   to: string; subject: string; html: string;
   attachment?: { filename: string; contentBase64: string; mimeType?: string };
 }) {
-  const LOVABLE_API_KEY = process.env.LOVABLE_API_KEY;
-  const GOOGLE_MAIL_API_KEY = process.env.GOOGLE_MAIL_API_KEY;
-  if (!LOVABLE_API_KEY || !GOOGLE_MAIL_API_KEY) throw new Error("Email API keys not configured");
-
-  const boundary = `boundary_${Date.now()}`;
-  const parts: string[] = [];
-  parts.push(
-    `--${boundary}\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${b64url(html)}`,
-  );
-  if (attachment) {
-    parts.push(
-      `--${boundary}\r\nContent-Type: ${attachment.mimeType ?? "application/octet-stream"}; name="${attachment.filename}"\r\nContent-Transfer-Encoding: base64\r\nContent-Disposition: attachment; filename="${attachment.filename}"\r\n\r\n${attachment.contentBase64}`,
-    );
+  const MAILJET_API_KEY = process.env.MAILJET_API_KEY;
+  const MAILJET_SECRET_KEY = process.env.MAILJET_SECRET_KEY;
+  const FROM_EMAIL = process.env.MAILJET_FROM_EMAIL;
+  const FROM_NAME = process.env.MAILJET_FROM_NAME || "Plataforma de Recibos — UdeCataluña";
+  if (!MAILJET_API_KEY || !MAILJET_SECRET_KEY || !FROM_EMAIL) {
+    throw new Error("Mailjet no está configurado (faltan variables de entorno)");
   }
-  const raw =
-    `To: ${to}\r\nSubject: ${encodeSubject(subject)}\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary="${boundary}"\r\n\r\n` +
-    parts.join("\r\n") +
-    `\r\n--${boundary}--`;
 
-  const res = await fetch(`${GATEWAY}/messages/send`, {
+  const auth = Buffer.from(`${MAILJET_API_KEY}:${MAILJET_SECRET_KEY}`).toString("base64");
+
+  const message: Record<string, unknown> = {
+    From: { Email: FROM_EMAIL, Name: FROM_NAME },
+    To: [{ Email: to }],
+    Subject: subject,
+    HTMLPart: html,
+  };
+  if (attachment) {
+    message.Attachments = [{
+      ContentType: attachment.mimeType ?? "application/pdf",
+      Filename: attachment.filename,
+      Base64Content: attachment.contentBase64,
+    }];
+  }
+
+  const res = await fetch("https://api.mailjet.com/v3.1/send", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-lovable-api-key": LOVABLE_API_KEY,
-      "x-api-key": GOOGLE_MAIL_API_KEY,
+      Authorization: `Basic ${auth}`,
     },
-    body: JSON.stringify({ raw: b64url(raw) }),
+    body: JSON.stringify({ Messages: [message] }),
   });
-  if (!res.ok) throw new Error(`Gmail send failed: ${res.status} ${await res.text()}`);
+  const json = await res.json().catch(() => null) as
+    | { Messages?: { Status?: string; Errors?: { ErrorMessage?: string }[] }[] }
+    | null;
+  const msgResult = json?.Messages?.[0];
+  if (!res.ok || msgResult?.Status !== "success") {
+    const detail = msgResult?.Errors?.map((e) => e.ErrorMessage).filter(Boolean).join("; ");
+    throw new Error(`Mailjet send failed: ${detail || msgResult?.Status || res.status}`);
+  }
 }
 
 function emailLayout({ title, intro, bodyHtml }: { title: string; intro?: string; bodyHtml: string }): string {
@@ -95,26 +91,50 @@ export async function POST(request: NextRequest) {
   if (!adminUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json() as {
-    to: string; cc?: string | null; nombre: string;
-    recibo_numero: number | null; pdfBase64: string;
+    kind?: "approved" | "rejected";
+    comercial_email: string;
+    nombre: string;
+    recibo_numero: number | null;
+    pdfBase64?: string;
+    rejection_reason?: string;
   };
+
+  if (!body.comercial_email) return NextResponse.json({ ok: true, skipped: "no comercial_email" });
+
+  const financieraEmail = process.env.FINANCIERA_NOTIFY_EMAIL;
+  const kind = body.kind ?? "approved";
+
+  if (kind === "rejected") {
+    const html = emailLayout({
+      title: "Solicitud rechazada",
+      intro: `Hola, la solicitud de <b>${body.nombre}</b> fue <b>rechazada</b>.`,
+      bodyHtml: `<p style="margin:0 0 12px;"><b>Motivo:</b> ${body.rejection_reason ?? "—"}</p>
+        <p style="margin:0;">Corrígela y reenvíala desde la plataforma cuando esté lista.</p>`,
+    });
+    await sendMailjet({
+      to: body.comercial_email,
+      subject: `Solicitud rechazada — ${body.nombre}`,
+      html,
+    });
+    return NextResponse.json({ ok: true });
+  }
 
   const filename = `Recibo-${body.recibo_numero ?? "UdeCataluña"}.pdf`;
   const html = emailLayout({
-    title: "Tu recibo de pago está listo",
-    intro: `Hola ${body.nombre}, tu solicitud ha sido <b>aprobada</b>.`,
-    bodyHtml: `<p style="margin:0 0 12px;">Adjunto encontrarás tu recibo de pago${
+    title: "Solicitud aprobada",
+    intro: `Hola, la solicitud de <b>${body.nombre}</b> fue <b>aprobada</b>.`,
+    bodyHtml: `<p style="margin:0 0 12px;">Adjunto encontrarás el recibo${
       body.recibo_numero ? ` <b>N° ${body.recibo_numero}</b>` : ""
     } en formato PDF.</p>`,
   });
 
-  const recipients = [body.to, ...(body.cc ? [body.cc] : [])];
+  const recipients = [body.comercial_email, ...(financieraEmail ? [financieraEmail] : [])];
   for (const to of recipients) {
-    await sendGmail({
+    await sendMailjet({
       to,
-      subject: `Tu recibo de pago${body.recibo_numero ? ` N° ${body.recibo_numero}` : ""} — UdeCataluña`,
+      subject: `Solicitud aprobada${body.recibo_numero ? ` N° ${body.recibo_numero}` : ""} — ${body.nombre}`,
       html,
-      attachment: { filename, contentBase64: body.pdfBase64, mimeType: "application/pdf" },
+      ...(body.pdfBase64 ? { attachment: { filename, contentBase64: body.pdfBase64, mimeType: "application/pdf" } } : {}),
     });
   }
 

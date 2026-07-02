@@ -107,7 +107,12 @@ const DOC_TYPE_LABELS: Record<string, string> = {
 };
 
 async function sendInvoiceEmail(data: {
-  to: string; cc?: string | null; nombre: string; recibo_numero: number | null; pdfBase64: string;
+  kind?: "approved" | "rejected";
+  comercial_email: string;
+  nombre: string;
+  recibo_numero: number | null;
+  pdfBase64?: string;
+  rejection_reason?: string;
 }) {
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData.session?.access_token;
@@ -246,6 +251,7 @@ export default function AdminPanel() {
     if (!(await assertNotStale(r))) return;
     try {
       let pdfPath: string | null = null;
+      let pdfBase64: string | undefined;
       if (approvalPdf) {
         const ext = approvalPdf.name.includes(".") ? approvalPdf.name.split(".").pop() : "bin";
         const path = `approved/${r.id}.${ext}`;
@@ -254,6 +260,13 @@ export default function AdminPanel() {
           .upload(path, approvalPdf, { contentType: approvalPdf.type || "application/octet-stream", upsert: true });
         if (upErr) throw upErr;
         pdfPath = path;
+        const dataUrl: string = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(approvalPdf);
+        });
+        pdfBase64 = dataUrl.split(",")[1];
       }
       const reciboNumero = Number(manualReciboNumero);
       const user = (await supabase.auth.getUser()).data.user;
@@ -269,6 +282,16 @@ export default function AdminPanel() {
         .eq("id", r.id);
       if (error) throw error;
       toast.success(pdfPath ? "Solicitud aprobada con PDF adjunto" : "Solicitud aprobada");
+      if (r.comercial_email) {
+        try {
+          await sendInvoiceEmail({ kind: "approved", comercial_email: r.comercial_email, nombre: r.nombre, recibo_numero: reciboNumero, pdfBase64 });
+          toast.success("Notificación enviada al comercial");
+        } catch (e) {
+          toast.error("No se pudo enviar la notificación: " + (e instanceof Error ? e.message : ""));
+        }
+      } else {
+        toast.message("Esta solicitud no tiene correo de comercial registrado — no se envió notificación");
+      }
       setApproving(null);
       setApprovalPdf(null);
       setManualReciboNumero("");
@@ -304,7 +327,7 @@ export default function AdminPanel() {
     if (error) return toast.error(error.message);
     toast.success("Solicitud aprobada");
 
-    if (r.email) {
+    if (r.comercial_email) {
       try {
         const { getPdfBase64 } = await import("@/lib/generate-invoice-pdf");
         const approved = {
@@ -315,13 +338,13 @@ export default function AdminPanel() {
           template_id: selectedTemplate || null,
         };
         const base64 = await getPdfBase64(approved);
-        await sendInvoiceEmail({ to: r.email, cc: r.comercial_email ?? null, nombre: r.nombre, recibo_numero: reciboNumero, pdfBase64: base64 });
-        toast.success("Recibo enviado al estudiante y al asesor por correo");
+        await sendInvoiceEmail({ kind: "approved", comercial_email: r.comercial_email, nombre: r.nombre, recibo_numero: reciboNumero, pdfBase64: base64 });
+        toast.success("Notificación de aprobación enviada");
       } catch (e) {
-        toast.error("No se pudo enviar el correo al estudiante: " + (e instanceof Error ? e.message : ""));
+        toast.error("No se pudo enviar la notificación: " + (e instanceof Error ? e.message : ""));
       }
     } else {
-      toast.message("El estudiante no tiene correo registrado — no se envió email");
+      toast.message("Esta solicitud no tiene correo de comercial registrado — no se envió notificación");
     }
 
     setApproving(null);
@@ -345,6 +368,16 @@ export default function AdminPanel() {
       .eq("id", rejecting.id);
     if (error) return toast.error(error.message);
     toast.success("Solicitud rechazada — el comercial puede corregirla y reenviarla");
+    if (rejecting.comercial_email) {
+      try {
+        await sendInvoiceEmail({ kind: "rejected", comercial_email: rejecting.comercial_email, nombre: rejecting.nombre, recibo_numero: rejecting.recibo_numero, rejection_reason: reason });
+        toast.success("Notificación enviada al comercial");
+      } catch (e) {
+        toast.error("No se pudo enviar la notificación: " + (e instanceof Error ? e.message : ""));
+      }
+    } else {
+      toast.message("Esta solicitud no tiene correo de comercial registrado — no se envió notificación");
+    }
     setRejecting(null);
     setRejectCategory("");
     setRejectOtherText("");
