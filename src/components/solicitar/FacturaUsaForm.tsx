@@ -84,10 +84,16 @@ export function FacturaUsaForm({ editId, duplicateFromId }: { editId?: string; d
   const [cohortes, setCohortes] = useState<CohorteRow[]>([]);
   const [loadingCohortes, setLoadingCohortes] = useState(false);
   const [manualProg, setManualProg] = useState(false);
+  const [tipoProgramaFiltro, setTipoProgramaFiltro] = useState("");
 
   useEffect(() => {
     listProgramas().then(setProgramas).catch(() => setProgramas([]));
   }, []);
+
+  const tiposProgramaDisponibles = useMemo(
+    () => [...new Set(programas.map((p) => p.tipo_programa).filter((t): t is string => !!t))].sort(),
+    [programas],
+  );
 
   const loadFormData = async (sourceId: string, isEdit: boolean) => {
     const { data, error } = await supabase.from("invoice_requests").select("*").eq("id", sourceId).maybeSingle();
@@ -414,6 +420,15 @@ export function FacturaUsaForm({ editId, duplicateFromId }: { editId?: string; d
           {/* Programa */}
           <Section title="Datos del programa">
             <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Tipo de programa">
+                <Select value={tipoProgramaFiltro || "__todos"} onValueChange={(v) => setTipoProgramaFiltro(v === "__todos" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__todos">Todos</SelectItem>
+                    {tiposProgramaDisponibles.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
               <Field label="Programa *">
                 <Popover open={openProg} onOpenChange={setOpenProg}>
                   <PopoverTrigger asChild>
@@ -430,7 +445,9 @@ export function FacturaUsaForm({ editId, duplicateFromId }: { editId?: string; d
                           {programas.length === 0 ? "Aún no hay programas en el catálogo." : "Sin resultados."}
                         </CommandEmpty>
                         <CommandGroup>
-                          {programas.map((p) => {
+                          {programas
+                            .filter((p) => !tipoProgramaFiltro || p.tipo_programa === tipoProgramaFiltro)
+                            .map((p) => {
                             const snies = p.codigo_snies?.match(/\b(\d{5,7})\b/)?.[1] ?? null;
                             return (
                               <CommandItem
