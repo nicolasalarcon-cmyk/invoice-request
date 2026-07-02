@@ -31,6 +31,8 @@ dist-ssr
 .env
 .env.*
 env
+# ...excepto la plantilla, que no debe tener secretos reales
+!.env.example
 
 # Lovable platform metadata
 .lovable/
