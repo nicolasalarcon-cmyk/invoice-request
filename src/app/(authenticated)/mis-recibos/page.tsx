@@ -17,6 +17,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 type Status = "pendiente" | "aprobada" | "rechazada" | "requiere_info";
 type DocType = "orden_matricula" | "factura_usa" | "factura_colombia" | "factura_paypal";
 
+const DOC_TYPE_LABELS: Record<string, string> = {
+  orden_matricula: "Orden de Matrícula",
+  factura_usa: "Factura USA",
+  factura_colombia: "Factura Colombia",
+  factura_paypal: "Factura PayPal",
+};
+
 interface AttachmentItem { path: string; name: string; size: number; type: string }
 
 interface Req {
@@ -273,7 +280,8 @@ export default function MisRecibos() {
                       {r.recibo_numero && <span className="text-xs font-mono text-muted-foreground">#{r.recibo_numero}</span>}
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      ID {r.identificacion} · {r.concepto ?? "Matrícula"} · {r.tipo_programa ?? ""} {r.programa} · {r.periodo}
+                      <span className="font-medium text-foreground">{DOC_TYPE_LABELS[r.document_type ?? ""] ?? r.document_type ?? "—"}</span>
+                      {" · "}ID {r.identificacion} · {r.concepto ?? "Matrícula"} · {r.tipo_programa ?? ""} {r.programa} · {r.periodo}
                     </p>
                     <p className="mt-2 text-xs text-muted-foreground">Enviada {formatDate(r.created_at)}</p>
                     {r.status === "rechazada" && r.rejection_reason && (

@@ -18,7 +18,7 @@ import {
   AlertTriangle, CheckCircle2, XCircle, FileDown, Inbox, Search, Pencil,
   FileText, Trash2, Eye, Copy, BookOpen, Wrench,
 } from "lucide-react";
-import { listTemplates, type InvoiceTemplate } from "@/lib/invoice-template";
+import { listTemplates, getTemplateDocType, type InvoiceTemplate } from "@/lib/invoice-template";
 import { useLiveRefresh } from "@/lib/use-live-refresh";
 import { deleteInvoiceFiles } from "@/lib/delete-invoice-files";
 import { cn } from "@/lib/utils";
@@ -229,9 +229,13 @@ export default function AdminPanel() {
       setSelectedTemplate("");
       return;
     }
-    const matchTipo = templates.find((t) => t.is_default && t.default_for === r.tipo_programa);
-    const matchAny = templates.find((t) => t.is_default && !t.default_for);
-    setSelectedTemplate(r.template_id ?? matchTipo?.id ?? matchAny?.id ?? templates[0]?.id ?? "");
+    const docTemplates = templates.filter((t) => getTemplateDocType(t) === r.document_type);
+    const matchTipo = docTemplates.find((t) => t.is_default && t.default_for === r.tipo_programa);
+    const matchAny = docTemplates.find((t) => t.is_default && !t.default_for);
+    setSelectedTemplate(
+      (r.template_id && docTemplates.some((t) => t.id === r.template_id) ? r.template_id : null)
+      ?? matchTipo?.id ?? matchAny?.id ?? docTemplates[0]?.id ?? "",
+    );
   };
 
   const assertNotStale = async (r: Req) => {
@@ -540,7 +544,8 @@ export default function AdminPanel() {
                         )}
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        ID {r.identificacion} · {r.concepto ?? "Matrícula"} · {r.tipo_programa ?? ""} {r.programa} · {r.periodo}
+                        <span className="font-medium text-foreground">{DOC_TYPE_LABELS[r.document_type ?? ""] ?? r.document_type ?? "—"}</span>
+                        {" · "}ID {r.identificacion} · {r.concepto ?? "Matrícula"} · {r.tipo_programa ?? ""} {r.programa} · {r.periodo}
                       </p>
                       {r.comercial_nombre && (
                         <p className="text-xs text-muted-foreground">Comercial: {r.comercial_nombre} ({r.comercial_email})</p>
@@ -683,11 +688,13 @@ export default function AdminPanel() {
               <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
                 <SelectTrigger><SelectValue placeholder="Plantilla" /></SelectTrigger>
                 <SelectContent>
-                  {templates.map((t) => (
-                    <SelectItem key={t.id} value={t.id!}>
-                      {t.nombre}{t.is_default && (t.default_for ? ` · default ${t.default_for}` : " · default")}
-                    </SelectItem>
-                  ))}
+                  {templates
+                    .filter((t) => getTemplateDocType(t) === approving?.document_type)
+                    .map((t) => (
+                      <SelectItem key={t.id} value={t.id!}>
+                        {t.nombre}{t.is_default && (t.default_for ? ` · default ${t.default_for}` : " · default")}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
               <DialogFooter>
