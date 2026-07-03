@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { FileText, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -71,21 +71,13 @@ export default function LoginPage() {
 
       <div className="relative w-full max-w-md">
         {/* Logo */}
-        <div className="mb-8 flex flex-col items-center gap-4">
-          <div
-            className="flex h-16 w-16 items-center justify-center rounded-2xl shadow-lg shadow-blue-500/20"
-            style={{ background: "linear-gradient(135deg, #3B82F6, #6366F1)" }}
-          >
-            <FileText className="h-8 w-8 text-white" />
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-bold tracking-tight text-slate-900">
-              Recibos
-            </p>
-            <p className="text-sm font-semibold uppercase tracking-wider text-blue-600">
-              UdeCataluña
-            </p>
-          </div>
+        <div className="mb-8 flex flex-col items-center gap-2">
+          <p className="text-4xl font-bold tracking-tight" style={{ color: "#000b7b" }}>
+            UdeCataluña
+          </p>
+          <p className="text-sm font-medium text-slate-500">
+            Solicitudes
+          </p>
         </div>
 
         {/* Card */}

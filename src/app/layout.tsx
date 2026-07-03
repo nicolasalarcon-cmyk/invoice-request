@@ -3,7 +3,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
-  title: "FacturasUC · UdeCataluña",
+  title: "SolicitudesUC · UdeCataluña",
   description:
     "Plataforma de gestión y aprobación de recibos de pago para la Corporación Universitaria de Cataluña.",
   authors: [{ name: "UdeCataluña" }],
@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     icon: "/favicon.svg",
   },
   openGraph: {
-    title: "FacturasUC · UdeCataluña",
+    title: "SolicitudesUC · UdeCataluña",
     description:
       "Plataforma de gestión y aprobación de recibos de pago para la Corporación Universitaria de Cataluña.",
     type: "website",

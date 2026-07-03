@@ -23,7 +23,7 @@ async function sendMailjet({ to, subject, html, attachment }: {
   const MAILJET_API_KEY = process.env.MAILJET_API_KEY;
   const MAILJET_SECRET_KEY = process.env.MAILJET_SECRET_KEY;
   const FROM_EMAIL = process.env.MAILJET_FROM_EMAIL;
-  const FROM_NAME = process.env.MAILJET_FROM_NAME || "Plataforma de Recibos — UdeCataluña";
+  const FROM_NAME = process.env.MAILJET_FROM_NAME || "Plataforma de Solicitudes — UdeCataluña";
   if (!MAILJET_API_KEY || !MAILJET_SECRET_KEY || !FROM_EMAIL) {
     throw new Error("Mailjet no está configurado (faltan variables de entorno)");
   }
@@ -70,7 +70,7 @@ function emailLayout({ title, intro, bodyHtml }: { title: string; intro?: string
     <tr><td align="center">
       <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;">
         <tr><td style="background:linear-gradient(135deg,#0a2540 0%,#13386b 100%);padding:28px 32px;">
-          <div style="color:#ffffff;font-size:22px;font-weight:600;">Plataforma de Recibos</div>
+          <div style="color:#ffffff;font-size:22px;font-weight:600;">Plataforma de Solicitudes</div>
         </td></tr>
         <tr><td style="padding:32px;">
           <h1 style="margin:0 0 16px;font-size:20px;color:#0a2540;">${title}</h1>

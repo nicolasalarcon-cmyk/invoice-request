@@ -6,8 +6,9 @@ import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { usePendingCount } from "@/lib/use-pending-count";
+import { useIdleLogout } from "@/lib/use-idle-logout";
 import {
-  FileText, LogOut, LayoutDashboard, ClipboardList,
+  LogOut, LayoutDashboard, ClipboardList,
   FilePlus, Users, LayoutTemplate, Hash, BookOpen,
 } from "lucide-react";
 
@@ -72,6 +73,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
   } = useAuth();
   const router = useRouter();
   const pendingCount = usePendingCount(canViewAllRequests);
+  useIdleLogout(!!user);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
@@ -97,14 +99,10 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
       <header className="sticky top-0 z-50 border-b border-slate-200 shadow-sm bg-white/95 backdrop-blur-sm">
         {/* Top bar */}
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl shadow-md" style={{ background: "linear-gradient(135deg, #3B82F6, #6366F1)" }}>
-              <FileText className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <span className="block text-base font-bold leading-none text-slate-900">Recibos</span>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-blue-700">UdeCataluña</span>
-            </div>
+          <Link href={canViewAllRequests ? "/admin" : "/mis-recibos"} className="flex items-center gap-3">
+            <span className="text-2xl font-bold leading-none" style={{ color: "#000b7b" }}>UdeCataluña</span>
+            <div className="hidden sm:block h-6 w-px bg-slate-200" />
+            <span className="hidden sm:block text-sm font-medium leading-none text-slate-500">Solicitudes</span>
           </Link>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 rounded-full border border-slate-100 bg-slate-50 px-3 py-1.5">
