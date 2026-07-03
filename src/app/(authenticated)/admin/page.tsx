@@ -753,7 +753,7 @@ export default function AdminPanel() {
 
       {/* Ver Datos */}
       <Dialog open={!!previewing} onOpenChange={(o) => !o && setPreviewing(null)}>
-        <DialogContent className="max-w-4xl max-h-[88vh] overflow-y-auto p-0 gap-0">
+        <DialogContent className="max-w-5xl max-h-[88vh] overflow-y-auto p-0 gap-0">
           {previewing && (() => {
             const isPersonaFlow = previewing.document_type !== "orden_matricula";
             const isJuridica = previewing.tipo_persona === "Persona Jurídica";
@@ -773,7 +773,7 @@ export default function AdminPanel() {
                   </p>
                 </DialogHeader>
 
-                <div className="space-y-6 px-6 py-5">
+                <div className="space-y-7 px-8 py-6">
                   <DetailSection title={isPersonaFlow ? "Datos del tercero" : "Datos del estudiante"}>
                     {isPersonaFlow && (
                       <div className="sm:col-span-2">
@@ -939,10 +939,10 @@ export default function AdminPanel() {
 function DetailSection({ title, children, noGrid }: { title: string; children: ReactNode; noGrid?: boolean }) {
   return (
     <div>
-      <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border pb-1.5 mb-3">
+      <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border pb-2 mb-4">
         {title}
       </h3>
-      {noGrid ? children : <div className="grid gap-3 text-sm sm:grid-cols-2">{children}</div>}
+      {noGrid ? children : <div className="grid gap-x-8 gap-y-5 text-sm sm:grid-cols-2">{children}</div>}
     </div>
   );
 }
@@ -951,7 +951,7 @@ function PreviewRow({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <p className="text-xs uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className="mt-0.5 text-foreground">{value}</p>
+      <p className="mt-1 text-[15px] font-medium text-foreground">{value}</p>
     </div>
   );
 }
