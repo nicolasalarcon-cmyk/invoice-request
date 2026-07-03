@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     "Plataforma de gestión y aprobación de recibos de pago para la Corporación Universitaria de Cataluña.",
   authors: [{ name: "UdeCataluña" }],
   icons: {
-    icon: "/favicon.png",
+    icon: "/favicon.svg",
   },
   openGraph: {
     title: "FacturasUC · UdeCataluña",
