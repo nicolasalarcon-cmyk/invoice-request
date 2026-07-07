@@ -110,6 +110,7 @@ export type Database = {
           approved_by: string | null
           approved_pdf_path: string | null
           archived_by_comercial: boolean
+          archived_by_reviewer: boolean
           asesor_nombre: string | null
           attachments: Json
           ciudad: string | null
@@ -122,6 +123,7 @@ export type Database = {
           convocatoria: string | null
           created_at: string
           created_by: string | null
+          created_by_role: string | null
           descuento: number
           descuento_bono: number
           descuento_pct: number
@@ -172,6 +174,7 @@ export type Database = {
           approved_by?: string | null
           approved_pdf_path?: string | null
           archived_by_comercial?: boolean
+          archived_by_reviewer?: boolean
           asesor_nombre?: string | null
           attachments?: Json
           ciudad?: string | null
@@ -184,6 +187,7 @@ export type Database = {
           convocatoria?: string | null
           created_at?: string
           created_by?: string | null
+          created_by_role?: string | null
           descuento?: number
           descuento_bono?: number
           descuento_pct?: number
@@ -234,6 +238,7 @@ export type Database = {
           approved_by?: string | null
           approved_pdf_path?: string | null
           archived_by_comercial?: boolean
+          archived_by_reviewer?: boolean
           asesor_nombre?: string | null
           attachments?: Json
           ciudad?: string | null
@@ -246,6 +251,7 @@ export type Database = {
           convocatoria?: string | null
           created_at?: string
           created_by?: string | null
+          created_by_role?: string | null
           descuento?: number
           descuento_bono?: number
           descuento_pct?: number

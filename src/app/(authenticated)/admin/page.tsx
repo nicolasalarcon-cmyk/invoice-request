@@ -100,6 +100,9 @@ interface Req {
   attachments: AttachmentItem[] | null;
   approved_pdf_path: string | null;
   archived_by_comercial: boolean;
+  archived_by_reviewer: boolean;
+  created_by: string | null;
+  created_by_role: string | null;
 }
 
 const isUploadFlow = (r: Req | null) =>
@@ -132,7 +135,7 @@ async function sendInvoiceEmail(data: {
 }
 
 export default function AdminPanel() {
-  const { isCartera, canApprove, canDelete, canViewAllRequests, loading: authLoading } = useAuth();
+  const { role, isCartera, canApprove, canDelete, canViewAllRequests, loading: authLoading } = useAuth();
   const [items, setItems] = useState<Req[]>([]);
   const [templates, setTemplates] = useState<InvoiceTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -199,10 +202,22 @@ export default function AdminPanel() {
     return !!parent?.rejection_reason?.startsWith("Corrección solicitada tras aprobación");
   };
 
+  // No notificar cuando quien creó la solicitud es un rol interno
+  // (admin/super_admin/financiera) probando por su cuenta — solo tiene
+  // sentido avisar cuando quien la creó fue un comercial de verdad.
+  const shouldNotify = (r: Req) =>
+    !!r.comercial_email
+    && r.created_by_role !== "admin"
+    && r.created_by_role !== "super_admin"
+    && r.created_by_role !== "financiera";
+
   const filtered = useMemo(() => {
     const s = q.toLowerCase().trim();
     const fromTs = dateFrom ? new Date(dateFrom).getTime() : 0;
     return items.filter((r) => {
+      // "Eliminar" de Financiera/Cartera solo oculta de su propia vista,
+      // no afecta lo que ve Admin/SuperAdmin.
+      if (r.archived_by_reviewer && (role === "financiera" || role === "cartera")) return false;
       if (statusFilter !== "all" && r.status !== statusFilter) return false;
       if (tipoFilter !== "all" && r.document_type !== tipoFilter) return false;
       if (fromTs && new Date(r.created_at).getTime() < fromTs) return false;
@@ -215,7 +230,7 @@ export default function AdminPanel() {
         (r.comercial_email ?? "").toLowerCase().includes(s)
       );
     });
-  }, [items, q, statusFilter, tipoFilter, dateFrom]);
+  }, [items, q, statusFilter, tipoFilter, dateFrom, role]);
 
   if (authLoading) return <p className="p-6 text-sm text-muted-foreground">Cargando…</p>;
   if (!canViewAllRequests) {
@@ -310,9 +325,9 @@ export default function AdminPanel() {
       if (error) throw error;
       await purgeSupersededAttachments(r);
       toast.success(pdfPath ? "Solicitud aprobada con PDF adjunto" : "Solicitud aprobada");
-      if (r.comercial_email) {
+      if (shouldNotify(r)) {
         try {
-          await sendInvoiceEmail({ kind: "approved", comercial_email: r.comercial_email, nombre: r.nombre, recibo_numero: reciboNumero, pdfBase64 });
+          await sendInvoiceEmail({ kind: "approved", comercial_email: r.comercial_email!, nombre: r.nombre, recibo_numero: reciboNumero, pdfBase64 });
           toast.success("Notificación enviada al comercial");
         } catch (e) {
           toast.error("No se pudo enviar la notificación: " + (e instanceof Error ? e.message : ""));
@@ -356,7 +371,7 @@ export default function AdminPanel() {
     await purgeSupersededAttachments(r);
     toast.success("Solicitud aprobada");
 
-    if (r.comercial_email) {
+    if (shouldNotify(r)) {
       try {
         const { getPdfBase64 } = await import("@/lib/generate-invoice-pdf");
         const approved = {
@@ -367,7 +382,7 @@ export default function AdminPanel() {
           template_id: selectedTemplate || null,
         };
         const base64 = await getPdfBase64(approved);
-        await sendInvoiceEmail({ kind: "approved", comercial_email: r.comercial_email, nombre: r.nombre, recibo_numero: reciboNumero, pdfBase64: base64 });
+        await sendInvoiceEmail({ kind: "approved", comercial_email: r.comercial_email!, nombre: r.nombre, recibo_numero: reciboNumero, pdfBase64: base64 });
         toast.success("Notificación de aprobación enviada");
       } catch (e) {
         toast.error("No se pudo enviar la notificación: " + (e instanceof Error ? e.message : ""));
@@ -398,9 +413,9 @@ export default function AdminPanel() {
       .eq("id", rejecting.id);
     if (error) return toast.error(error.message);
     toast.success("Solicitud rechazada — el comercial puede corregirla y reenviarla");
-    if (rejecting.comercial_email) {
+    if (shouldNotify(rejecting)) {
       try {
-        await sendInvoiceEmail({ kind: "rejected", comercial_email: rejecting.comercial_email, nombre: rejecting.nombre, recibo_numero: rejecting.recibo_numero, rejection_reason: reason });
+        await sendInvoiceEmail({ kind: "rejected", comercial_email: rejecting.comercial_email!, nombre: rejecting.nombre, recibo_numero: rejecting.recibo_numero, rejection_reason: reason });
         toast.success("Notificación enviada al comercial");
       } catch (e) {
         toast.error("No se pudo enviar la notificación: " + (e instanceof Error ? e.message : ""));
@@ -421,6 +436,24 @@ export default function AdminPanel() {
     if (error) return toast.error(error.message);
     toast.success("Factura eliminada");
     load();
+  };
+
+  // "Eliminar" para Financiera/Cartera: solo oculta de su propia vista
+  // (no borra nada, ni afecta lo que ve Admin/SuperAdmin ni el comercial).
+  const hideForReviewer = async (r: Req) => {
+    if (!confirm(`¿Ocultar la solicitud de ${r.nombre} de tu bandeja? Seguirá visible para Admin.`)) return;
+    const { data, error } = await supabase
+      .from("invoice_requests")
+      .update({ archived_by_reviewer: true })
+      .eq("id", r.id)
+      .select("id");
+    if (error) return toast.error(error.message);
+    if (!data || data.length === 0) {
+      toast.error("No se pudo ocultar la solicitud (permisos).");
+      return;
+    }
+    setItems((prev) => prev.map((x) => x.id === r.id ? { ...x, archived_by_reviewer: true } : x));
+    toast.success("Solicitud ocultada de tu bandeja");
   };
 
   const duplicar = (r: Req) => {
@@ -669,6 +702,13 @@ export default function AdminPanel() {
                     {!isCartera && (r.status === "aprobada" || r.status === "corregida") && (
                       <Button size="sm" variant="outline" className="border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-slate-600 hover:text-white" onClick={() => duplicar(r)}>
                         <Copy className="mr-2 h-4 w-4" /> Duplicar
+                      </Button>
+                    )}
+                    {(role === "financiera" || role === "cartera")
+                      && (r.status === "aprobada" || r.status === "rechazada" || r.status === "corregida")
+                      && !r.archived_by_reviewer && (
+                      <Button size="sm" variant="outline" className="ml-auto border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-red-700 hover:text-white" onClick={() => hideForReviewer(r)}>
+                        <Trash2 className="mr-2 h-4 w-4" /> Eliminar
                       </Button>
                     )}
                     {canDelete && (

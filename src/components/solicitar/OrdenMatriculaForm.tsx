@@ -80,7 +80,7 @@ function deriveSemestre(fecha: string): string {
 }
 
 export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: string; duplicateFromId?: string }) {
-  const { user, canApprove, canViewAllRequests, isComercial, profile } = useAuth();
+  const { user, role, canApprove, canViewAllRequests, isComercial, profile } = useAuth();
   const isAdmin = canApprove;
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -314,6 +314,7 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
           ...payload,
           created_by: user.id,
           comercial_nombre: profile?.nombre_completo ?? null,
+          created_by_role: role,
           comercial_email: profile?.email ?? user.email ?? null,
           status: "pendiente",
           parent_id: editId,
@@ -339,6 +340,7 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
           ...payload,
           created_by: user.id,
           comercial_nombre: profile?.nombre_completo ?? null,
+          created_by_role: role,
           comercial_email: profile?.email ?? user.email ?? null,
           fecha_pago_extraordinario: extra,
           status: approveNow ? "aprobada" : "pendiente",

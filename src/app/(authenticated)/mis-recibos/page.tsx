@@ -222,8 +222,13 @@ export default function MisRecibos() {
 
   const archiveRequest = async (r: Req) => {
     if (!confirm(`¿Eliminar el recibo de ${r.nombre}? Esta acción no se puede deshacer.`)) return;
-    const { error } = await supabase.from("invoice_requests").update({ archived_by_comercial: true }).eq("id", r.id);
+    const { data, error } = await supabase
+      .from("invoice_requests")
+      .update({ archived_by_comercial: true })
+      .eq("id", r.id)
+      .select("id");
     if (error) { toast.error(error.message); return; }
+    if (!data || data.length === 0) { toast.error("No se pudo eliminar (permisos)."); return; }
     setItems((prev) => prev.filter((x) => x.id !== r.id));
     toast.success("Recibo eliminado");
   };
