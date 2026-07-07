@@ -651,3 +651,11 @@ USING (
   AND status IN ('aprobada'::invoice_status, 'rechazada'::invoice_status)
 );
 
+
+
+-- Permite registrar un valor parcial manual para "Matricula Parcial" en
+-- Orden de Matricula, que reemplaza el valor total mostrado en la factura
+-- sin aplicar descuento ni recargo por mora.
+
+ALTER TABLE public.invoice_requests
+  ADD COLUMN IF NOT EXISTS valor_parcial numeric;

@@ -49,6 +49,7 @@ interface Req {
   email: string | null;
   telefono: string | null;
   tipo_persona: string | null;
+  valor_parcial: number | null;
   empresa: string | null;
   nit: string | null;
   direccion: string | null;
@@ -437,6 +438,7 @@ export default function AdminPanel() {
       recargo_total: Number(r.recargo_total), fecha_limite_pago: r.fecha_limite_pago,
       fecha_pago_extraordinario: r.fecha_pago_extraordinario, template_id: r.template_id,
       tipo_programa: r.tipo_programa, document_type: r.document_type, tipo_persona: r.tipo_persona,
+      valor_parcial: r.valor_parcial,
       empresa: x.empresa ?? null, cliente_nit: x.nit ?? null, direccion: x.direccion ?? null,
       ciudad: x.ciudad ?? null, telefono: x.telefono ?? null, pais: x.pais ?? null,
       email: r.email, nemonico: x.nemonico ?? null, observaciones: r.observaciones,
@@ -797,7 +799,6 @@ export default function AdminPanel() {
                       <>
                         <PreviewRow label={isPersonaFlow ? "Nombre" : "Estudiante"} value={previewing.nombre} />
                         <PreviewRow label="Identificación" value={previewing.identificacion} />
-                        {!isPersonaFlow && <PreviewRow label="Código estudiante" value={previewing.codigo_estudiante ?? "—"} />}
                         {!isPersonaFlow && <PreviewRow label="Tipo de financiación" value={previewing.tipo_persona ?? "—"} />}
                       </>
                     )}
@@ -820,14 +821,23 @@ export default function AdminPanel() {
                   </DetailSection>
 
                   <DetailSection title="Valores">
-                    <PreviewRow label="Matrícula" value={formatCOP(previewing.matricula)} />
-                    <PreviewRow label="Descuento %" value={`${previewing.descuento_pct}%`} />
-                    <PreviewRow label="Descuento bono" value={formatCOP(previewing.descuento_bono ?? 0)} />
-                    <PreviewRow label="Valor total" value={formatCOP(previewing.valor_total)} />
+                    {previewing.valor_parcial != null ? (
+                      <>
+                        <PreviewRow label="Valor de matrícula" value={formatCOP(previewing.matricula)} />
+                        <PreviewRow label="Valor parcial a facturar" value={formatCOP(previewing.valor_parcial)} />
+                      </>
+                    ) : (
+                      <>
+                        <PreviewRow label="Matrícula" value={formatCOP(previewing.matricula)} />
+                        <PreviewRow label="Descuento %" value={`${previewing.descuento_pct}%`} />
+                        <PreviewRow label="Descuento bono" value={formatCOP(previewing.descuento_bono ?? 0)} />
+                      </>
+                    )}
+                    <PreviewRow label="Valor total a pagar" value={formatCOP(previewing.valor_total)} />
                     {previewing.valor_total_empresa != null && (
                       <PreviewRow label="Valor total empresa" value={formatCOP(previewing.valor_total_empresa)} />
                     )}
-                    <PreviewRow label="Recargo" value={formatCOP(previewing.recargo_total)} />
+                    <PreviewRow label="Recargo por mora" value={formatCOP(previewing.recargo_total)} />
                     <PreviewRow label="Límite de pago" value={previewing.fecha_limite_pago ?? "—"} />
                     <PreviewRow label="Pago extraordinario" value={previewing.fecha_pago_extraordinario ?? "—"} />
                   </DetailSection>

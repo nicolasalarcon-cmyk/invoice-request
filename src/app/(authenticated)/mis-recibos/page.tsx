@@ -31,6 +31,7 @@ interface Req {
   status: Status;
   document_type: DocType | null;
   tipo_persona: string | null;
+  valor_parcial: number | null;
   nombre: string;
   identificacion: string;
   programa: string;
@@ -142,6 +143,7 @@ export default function MisRecibos() {
       tipo_programa: r.tipo_programa,
       document_type: r.document_type,
       tipo_persona: r.tipo_persona,
+      valor_parcial: r.valor_parcial,
       empresa: x.empresa ?? null,
       cliente_nit: x.nit ?? null,
       direccion: x.direccion ?? null,

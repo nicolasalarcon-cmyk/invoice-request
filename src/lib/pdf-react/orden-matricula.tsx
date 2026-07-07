@@ -61,9 +61,9 @@ export interface OrdenData {
 }
 
 export function resolveOrdenData(data: InvoiceData, tpl: InvoiceTemplate): OrdenData {
-  const matricula = Number(data.matricula) || 0;
-  const pct = Number(data.descuento_pct) || 0;
-  const bono = Number(data.descuento_bono) || 0;
+  const matricula = data.valor_parcial != null ? Number(data.valor_parcial) : (Number(data.matricula) || 0);
+  const pct = data.valor_parcial != null ? 0 : (Number(data.descuento_pct) || 0);
+  const bono = data.valor_parcial != null ? 0 : (Number(data.descuento_bono) || 0);
   const descuento = Math.round((matricula * pct) / 100);
   const valor_total = Number(data.valor_total) || Math.max(matricula - descuento - bono, 0);
   const recargo_total = Number(data.recargo_total) || Math.round(valor_total * 1.1);

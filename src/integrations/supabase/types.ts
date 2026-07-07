@@ -141,6 +141,7 @@ export type Database = {
           tipo_persona: string | null
           tipo_programa: string | null
           updated_at: string
+          valor_parcial: number | null
           valor_total: number
           valor_total_empresa: number | null
         }
@@ -201,6 +202,7 @@ export type Database = {
           tipo_persona?: string | null
           tipo_programa?: string | null
           updated_at?: string
+          valor_parcial?: number | null
           valor_total?: number
           valor_total_empresa?: number | null
         }
@@ -261,6 +263,7 @@ export type Database = {
           tipo_persona?: string | null
           tipo_programa?: string | null
           updated_at?: string
+          valor_parcial?: number | null
           valor_total?: number
           valor_total_empresa?: number | null
         }

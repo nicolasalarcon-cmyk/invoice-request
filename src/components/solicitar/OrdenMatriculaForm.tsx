@@ -43,6 +43,7 @@ interface FormState {
   periodo: string;
   concepto_opcion: string;
   concepto_otro: string;
+  valor_parcial: string;
   valor: string;
   descuento_pct: string;
   descuento_bono: string;
@@ -58,6 +59,7 @@ const EMPTY: FormState = {
   duracion: "", convocatoria: "",
   periodo: "1er Semestre 2026",
   concepto_opcion: "Matrícula", concepto_otro: "",
+  valor_parcial: "",
   valor: "", descuento_pct: "0", descuento_bono: "0",
   fecha_limite_pago: "", observaciones: "",
 };
@@ -125,6 +127,7 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
       periodo: data.periodo ?? "",
       concepto_opcion: isFijo ? conceptoRaw : "Otro",
       concepto_otro: isFijo ? "" : conceptoRaw,
+      valor_parcial: d.valor_parcial != null ? String(d.valor_parcial) : "",
       valor: String(data.matricula ?? ""),
       descuento_pct: String(data.descuento_pct ?? 0),
       descuento_bono: String(data.descuento_bono ?? 0),
@@ -184,14 +187,20 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
     }));
   };
 
+  const isMatriculaParcial = form.concepto_opcion === "Matrícula Parcial";
+  const isPartialActive = isMatriculaParcial && Number(form.valor_parcial) > 0;
+
   const { valor, descuento, descuentoBono, valorTotal } = useMemo(() => {
     const v = Number(form.valor) || 0;
+    if (isPartialActive) {
+      return { valor: v, descuento: 0, descuentoBono: 0, valorTotal: Number(form.valor_parcial) || 0 };
+    }
     const pct = Math.min(Math.max(Number(form.descuento_pct) || 0, 0), 100);
     const d = Math.round((v * pct) / 100);
     const bono = Math.max(Number(form.descuento_bono) || 0, 0);
     const total = Math.max(v - d - bono, 0);
     return { valor: v, descuento: d, descuentoBono: bono, valorTotal: total };
-  }, [form.valor, form.descuento_pct, form.descuento_bono]);
+  }, [form.valor, form.descuento_pct, form.descuento_bono, isPartialActive, form.valor_parcial]);
 
   const fieldVisible = (key: string) => cfg?.fields?.[key]?.visible !== false;
   const fieldLabel = (key: string, fallback: string) => cfg?.fields?.[key]?.label ?? fallback;
@@ -234,10 +243,11 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
         concepto: conceptoFinal,
         matricula: valor,
         descuento,
-        descuento_pct: Number(form.descuento_pct) || 0,
+        descuento_pct: isMatriculaParcial ? 0 : (Number(form.descuento_pct) || 0),
         descuento_bono: descuentoBono,
         valor_total: valorTotal,
         recargo_total: Math.round(valorTotal * 1.1),
+        valor_parcial: isPartialActive ? Number(form.valor_parcial) : null,
         fecha_limite_pago: baseLimite,
         fecha_pago_extraordinario: extra,
         observaciones: form.observaciones || null,
@@ -505,19 +515,38 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
           <Field label="Valor (COP) *">
             <Input required type="number" min={0} value={form.valor} onChange={(e) => update("valor", e.target.value)} />
           </Field>
-          <Field label="Descuento (%)">
-            <Input type="number" min={0} max={100} step="0.01" value={form.descuento_pct} onChange={(e) => update("descuento_pct", e.target.value)} />
-          </Field>
-          <Field label="Descuento Bono (COP)">
-            <Input type="number" min={0} step="1" value={form.descuento_bono} onChange={(e) => update("descuento_bono", e.target.value)} placeholder="0" />
-          </Field>
+          {isMatriculaParcial ? (
+            <Field label="Valor parcial a facturar (COP) *">
+              <Input
+                required
+                type="number"
+                min={0}
+                value={form.valor_parcial}
+                onChange={(e) => update("valor_parcial", e.target.value)}
+                placeholder="Monto acordado a facturar"
+              />
+            </Field>
+          ) : (
+            <>
+              <Field label="Descuento (%)">
+                <Input type="number" min={0} max={100} step="0.01" value={form.descuento_pct} onChange={(e) => update("descuento_pct", e.target.value)} />
+              </Field>
+              <Field label="Descuento Bono (COP)">
+                <Input type="number" min={0} step="1" value={form.descuento_bono} onChange={(e) => update("descuento_bono", e.target.value)} placeholder="0" />
+              </Field>
+            </>
+          )}
           <Field label="Valor total">
             <div className="flex h-9 items-center rounded-md border border-input bg-muted px-3 text-sm font-medium text-foreground">
               {formatCOP(valorTotal)}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {formatCOP(valor)} − {formatCOP(descuento)} (desc.) − {formatCOP(descuentoBono)} (bono)
-            </p>
+            {isMatriculaParcial ? (
+              <p className="mt-1 text-xs text-muted-foreground">Valor parcial acordado — no aplica descuento.</p>
+            ) : (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {formatCOP(valor)} − {formatCOP(descuento)} (desc.) − {formatCOP(descuentoBono)} (bono)
+              </p>
+            )}
           </Field>
           <Field label="Fecha límite de pago *">
             <Input required type="date" value={form.fecha_limite_pago} onChange={(e) => update("fecha_limite_pago", e.target.value)} />

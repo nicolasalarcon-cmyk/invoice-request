@@ -46,6 +46,7 @@ interface Row {
   empresa: string | null;
   nit: string | null;
   tipo_persona: string | null;
+  valor_parcial: number | null;
   programa: string | null;
   concepto: string | null;
   tipo_programa: string | null;
@@ -111,7 +112,7 @@ export default function Numeracion() {
         nombre,identificacion,codigo_estudiante,codigo_snies,periodo,
         plan_estudio,horas_programa,duracion,convocatoria,descuento_bono,
         recargo_total,fecha_pago_extraordinario,template_id,nemonico,
-        email,telefono,empresa,nit,tipo_persona,
+        email,telefono,empresa,nit,tipo_persona,valor_parcial,
         programa,concepto,tipo_programa,cohorte,fecha_inicio,fecha_limite_pago,
         pais,direccion,ciudad,numero_participantes,matricula,
         descuento_pct,descuento,valor_total,valor_total_empresa,
@@ -199,6 +200,7 @@ export default function Numeracion() {
     recargo_total: Number(r.recargo_total ?? 0), fecha_limite_pago: r.fecha_limite_pago,
     fecha_pago_extraordinario: r.fecha_pago_extraordinario, template_id: r.template_id,
     tipo_programa: r.tipo_programa, document_type: r.document_type, tipo_persona: r.tipo_persona,
+    valor_parcial: r.valor_parcial,
     empresa: r.empresa, cliente_nit: r.nit, direccion: r.direccion,
     ciudad: r.ciudad, telefono: r.telefono, pais: r.pais,
     email: r.email, nemonico: r.nemonico, observaciones: r.observaciones,
