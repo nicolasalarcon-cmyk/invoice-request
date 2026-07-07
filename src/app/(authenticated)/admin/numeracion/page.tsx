@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import React from "react";
 
 type DocType = "orden_matricula" | "factura_usa" | "factura_colombia" | "factura_paypal";
-type Status = "pendiente" | "aprobada" | "rechazada" | "requiere_info";
+type Status = "pendiente" | "aprobada" | "rechazada" | "corregida";
 
 interface Attachment { path: string; name: string; }
 interface Participant { nombre: string; cedula: string; email: string; telefono: string; }
@@ -84,14 +84,14 @@ const STATUS_LABELS: Record<Status, string> = {
   pendiente:     "Pendiente",
   aprobada:      "Aprobada",
   rechazada:     "Rechazada",
-  requiere_info: "Requiere info",
+  corregida:     "Corregida",
 };
 
 const STATUS_COLORS: Record<Status, string> = {
   pendiente:     "bg-amber-100 text-amber-800",
   aprobada:      "bg-green-100 text-green-800",
   rechazada:     "bg-red-100 text-red-800",
-  requiere_info: "bg-orange-100 text-orange-800",
+  corregida:     "bg-blue-100 text-blue-800",
 };
 
 export default function Numeracion() {
@@ -169,6 +169,7 @@ export default function Numeracion() {
   const counts = useMemo(() => ({
     total:     filtered.length,
     aprobada:  filtered.filter((r) => r.status === "aprobada").length,
+    corregida: filtered.filter((r) => r.status === "corregida").length,
     pendiente: filtered.filter((r) => r.status === "pendiente").length,
     rechazada: filtered.filter((r) => r.status === "rechazada").length,
   }), [filtered]);
@@ -293,8 +294,8 @@ export default function Numeracion() {
           <Chip label="Todos"         active={filterStatus === ""}              onClick={() => setFilterStatus("")} />
           <Chip label="Pendiente"     active={filterStatus === "pendiente"}     onClick={() => setFilterStatus("pendiente")} />
           <Chip label="Aprobada"      active={filterStatus === "aprobada"}      onClick={() => setFilterStatus("aprobada")} />
+          <Chip label="Corregida"     active={filterStatus === "corregida"}     onClick={() => setFilterStatus("corregida")} />
           <Chip label="Rechazada"     active={filterStatus === "rechazada"}     onClick={() => setFilterStatus("rechazada")} />
-          <Chip label="Requiere info" active={filterStatus === "requiere_info"} onClick={() => setFilterStatus("requiere_info")} />
         </div>
       </div>
 
@@ -302,6 +303,7 @@ export default function Numeracion() {
       <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
         <span><strong className="text-foreground">{counts.total}</strong> resultado(s)</span>
         <span className="text-green-700"><strong>{counts.aprobada}</strong> aprobadas</span>
+        <span className="text-blue-700"><strong>{counts.corregida}</strong> corregidas</span>
         <span className="text-amber-700"><strong>{counts.pendiente}</strong> pendientes</span>
         <span className="text-red-700"><strong>{counts.rechazada}</strong> rechazadas</span>
       </div>
@@ -369,7 +371,7 @@ export default function Numeracion() {
                       <td className="px-3 py-2 text-xs max-w-[120px] truncate">{r.comercial_nombre ?? "—"}</td>
                       <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
-                          {r.status === "aprobada" && (
+                          {(r.status === "aprobada" || r.status === "corregida") && (
                             <Button size="sm" variant="ghost" title="Descargar factura aprobada" onClick={() => downloadInvoice(r)}>
                               <Download className="h-4 w-4" />
                             </Button>

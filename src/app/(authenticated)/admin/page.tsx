@@ -23,7 +23,11 @@ import { useLiveRefresh } from "@/lib/use-live-refresh";
 import { deleteInvoiceFiles } from "@/lib/delete-invoice-files";
 import { cn } from "@/lib/utils";
 
-type Status = "pendiente" | "aprobada" | "rechazada" | "requiere_info";
+type Status = "pendiente" | "aprobada" | "rechazada" | "corregida";
+
+const CORRECTION_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
+const withinCorrectionWindow = (approvedAt: string | null) =>
+  !!approvedAt && Date.now() - new Date(approvedAt).getTime() < CORRECTION_WINDOW_MS;
 type DocType = "orden_matricula" | "factura_usa" | "factura_colombia" | "factura_paypal";
 
 const REJECT_OPTIONS = [
@@ -279,7 +283,7 @@ export default function AdminPanel() {
       const { error } = await supabase
         .from("invoice_requests")
         .update({
-          status: "aprobada",
+          status: isCorrectionOfApproved(r) ? "corregida" : "aprobada",
           approved_by: user?.id,
           approved_at: new Date().toISOString(),
           recibo_numero: reciboNumero,
@@ -321,7 +325,7 @@ export default function AdminPanel() {
     const { error } = await supabase
       .from("invoice_requests")
       .update({
-        status: "aprobada",
+        status: isCorrectionOfApproved(r) ? "corregida" : "aprobada",
         approved_by: user?.id,
         approved_at: new Date().toISOString(),
         recibo_numero: reciboNumero,
@@ -497,6 +501,7 @@ export default function AdminPanel() {
             <SelectItem value="all">Todos los estados</SelectItem>
             <SelectItem value="pendiente">Pendiente</SelectItem>
             <SelectItem value="aprobada">Aprobada</SelectItem>
+            <SelectItem value="corregida">Corregida</SelectItem>
             <SelectItem value="rechazada">Rechazada</SelectItem>
           </SelectContent>
         </Select>
@@ -579,7 +584,7 @@ export default function AdminPanel() {
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
-                    {!isCartera && canApprove && (r.status === "pendiente" || r.status === "requiere_info") && (
+                    {!isCartera && canApprove && r.status === "pendiente" && (
                       <>
                         <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white border-0" onClick={() => openApprove(r)}>
                           <CheckCircle2 className="mr-2 h-4 w-4" /> Aprobar
@@ -617,21 +622,32 @@ export default function AdminPanel() {
                     <Button size="sm" variant="outline" className="border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-blue-600 hover:text-white" onClick={() => setPreviewing(r)}>
                       <Eye className="mr-2 h-4 w-4" /> Ver Datos
                     </Button>
-                    {!isCartera && (
+                    {!isCartera && (r.status === "aprobada" || r.status === "corregida") && (
+                      withinCorrectionWindow(r.approved_at) ? (
+                        <Link href={`/solicitar?id=${r.id}`}>
+                          <Button size="sm" variant="outline" className="border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-indigo-600 hover:text-white">
+                            <Wrench className="mr-2 h-4 w-4" /> Corregir
+                          </Button>
+                        </Link>
+                      ) : (
+                        <Button size="sm" variant="outline" disabled title="Ya pasaron más de 3 días desde la aprobación — no se puede corregir.">
+                          <Wrench className="mr-2 h-4 w-4" /> Corregir
+                        </Button>
+                      )
+                    )}
+                    {!isCartera && r.status !== "aprobada" && r.status !== "corregida" && (
                       <Link href={`/solicitar?id=${r.id}`}>
                         <Button size="sm" variant="outline" className="border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-indigo-600 hover:text-white">
-                          {r.status === "aprobada"
-                            ? <><Wrench className="mr-2 h-4 w-4" /> Corregir</>
-                            : <><Pencil className="mr-2 h-4 w-4" /> Editar</>}
+                          <Pencil className="mr-2 h-4 w-4" /> Editar
                         </Button>
                       </Link>
                     )}
-                    {r.status === "aprobada" && (
+                    {(r.status === "aprobada" || r.status === "corregida") && (
                       <Button size="sm" variant="outline" className="border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-blue-600 hover:text-white" onClick={() => downloadPdf(r)}>
                         <FileDown className="mr-2 h-4 w-4" /> Descargar PDF
                       </Button>
                     )}
-                    {!isCartera && r.status === "aprobada" && (
+                    {!isCartera && (r.status === "aprobada" || r.status === "corregida") && (
                       <Button size="sm" variant="outline" className="border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-slate-600 hover:text-white" onClick={() => duplicar(r)}>
                         <Copy className="mr-2 h-4 w-4" /> Duplicar
                       </Button>
@@ -987,7 +1003,7 @@ function StatusBadge({ s }: { s: Status }) {
     pendiente: { label: "Pendiente", variant: "secondary" },
     aprobada: { label: "Aprobada", variant: "default" },
     rechazada: { label: "Rechazada", variant: "destructive" },
-    requiere_info: { label: "Requiere info", variant: "outline" },
+    corregida: { label: "Corregida", variant: "outline" },
   };
   const m = map[s];
   return <Badge variant={m.variant}>{m.label}</Badge>;

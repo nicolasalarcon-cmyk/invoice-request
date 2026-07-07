@@ -77,6 +77,7 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [originalStatus, setOriginalStatus] = useState<string | null>(null);
   const [originalReciboNumero, setOriginalReciboNumero] = useState<string | null>(null);
+  const [originalApprovedAt, setOriginalApprovedAt] = useState<string | null>(null);
   const [programas, setProgramas] = useState<Programa[]>([]);
   const [openProg, setOpenProg] = useState(false);
   const [cohortes, setCohortes] = useState<CohorteRow[]>([]);
@@ -102,7 +103,7 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
     const { data, error } = await supabase.from("invoice_requests").select("*").eq("id", sourceId).maybeSingle();
     if (error || !data) return;
     const d = data as Record<string, unknown>;
-    if (isEdit) { setOriginalStatus(data.status); setOriginalReciboNumero(data.recibo_numero ?? null); }
+    if (isEdit) { setOriginalStatus(data.status); setOriginalReciboNumero(data.recibo_numero ?? null); setOriginalApprovedAt(data.approved_at ?? null); }
     const att = (d.attachments as AttachmentItem[] | null) ?? [];
     setAttachments(Array.isArray(att) ? att : []);
     const parts = (d.participantes as Participant[] | null) ?? [];
@@ -229,12 +230,19 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
         attachments,
       };
 
-      if (editId && (originalStatus === "rechazada" || originalStatus === "aprobada") && !isAdmin) {
+      if (editId && (originalStatus === "rechazada" || originalStatus === "aprobada" || originalStatus === "corregida") && !isAdmin) {
         // Corregir y reenviar: se crea una solicitud nueva enlazada a la original.
-        // Si la original ya estaba aprobada, se envía a Financiera para el ajuste,
+        // Si la original ya estaba aprobada/corregida, se envía a Financiera para el ajuste,
         // conservando el mismo consecutivo; la original queda "rechazada" (con
         // motivo de corrección) y sin consecutivo, para no duplicarlo en Numeración.
-        const isFixingApproved = originalStatus === "aprobada";
+        const isFixingApproved = originalStatus === "aprobada" || originalStatus === "corregida";
+        if (isFixingApproved) {
+          const approvedTs = originalApprovedAt ? new Date(originalApprovedAt).getTime() : 0;
+          if (!approvedTs || Date.now() - approvedTs > 3 * 24 * 60 * 60 * 1000) {
+            toast.error("Ya pasaron más de 3 días desde la aprobación — no se puede corregir esta solicitud.");
+            return;
+          }
+        }
         if (isFixingApproved) {
           const { error: archErr } = await supabase
             .from("invoice_requests")
@@ -266,14 +274,7 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
         }
         toast.success(isFixingApproved ? "Solicitud enviada a corrección" : "Solicitud corregida y reenviada");
       } else if (editId) {
-        const next = { ...payload } as typeof payload & {
-          status?: "pendiente"; info_requested?: null;
-        };
-        if (originalStatus === "requiere_info" && !isAdmin) {
-          next.status = "pendiente";
-          next.info_requested = null;
-        }
-        const { error } = await supabase.from("invoice_requests").update(next).eq("id", editId);
+        const { error } = await supabase.from("invoice_requests").update(payload).eq("id", editId);
         if (error) throw error;
         toast.success("Solicitud actualizada");
       } else {

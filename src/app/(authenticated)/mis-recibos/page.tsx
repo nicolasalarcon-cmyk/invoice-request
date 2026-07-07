@@ -11,10 +11,14 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { formatCOP, formatDate } from "@/lib/format";
-import { FileDown, FilePlus, Inbox, MessageSquare, Search, Pencil, Trash2, Copy, Wrench, Eye } from "lucide-react";
+import { FileDown, FilePlus, Inbox, Search, Pencil, Trash2, Copy, Wrench, Eye } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
-type Status = "pendiente" | "aprobada" | "rechazada" | "requiere_info";
+type Status = "pendiente" | "aprobada" | "rechazada" | "corregida";
+
+const CORRECTION_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
+const withinCorrectionWindow = (approvedAt: string | null) =>
+  !!approvedAt && Date.now() - new Date(approvedAt).getTime() < CORRECTION_WINDOW_MS;
 type DocType = "orden_matricula" | "factura_usa" | "factura_colombia" | "factura_paypal";
 
 const DOC_TYPE_LABELS: Record<string, string> = {
@@ -48,6 +52,7 @@ interface Req {
   recibo_numero: string | null;
   recibo_fecha: string;
   created_at: string;
+  approved_at: string | null;
   rejection_reason: string | null;
   info_requested: string | null;
   comercial_nombre: string | null;
@@ -251,8 +256,8 @@ export default function MisRecibos() {
           <SelectContent>
             <SelectItem value="all">Todos los estados</SelectItem>
             <SelectItem value="pendiente">Pendiente</SelectItem>
-            <SelectItem value="requiere_info">Requiere info</SelectItem>
             <SelectItem value="aprobada">Aprobada</SelectItem>
+            <SelectItem value="corregida">Corregida</SelectItem>
             <SelectItem value="rechazada">Rechazada</SelectItem>
           </SelectContent>
         </Select>
@@ -294,11 +299,6 @@ export default function MisRecibos() {
                         Motivo: {r.rejection_reason}
                       </p>
                     )}
-                    {r.status === "requiere_info" && r.info_requested && (
-                      <p className="mt-2 rounded bg-accent px-2 py-1 text-xs text-accent-foreground">
-                        <MessageSquare className="mr-1 inline h-3 w-3" /> El admin pide: {r.info_requested}
-                      </p>
-                    )}
                     {r.attachments && r.attachments.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1">
                         {r.attachments.map((a) => (
@@ -321,7 +321,7 @@ export default function MisRecibos() {
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
-                  {(r.status === "pendiente" || r.status === "requiere_info") && (
+                  {r.status === "pendiente" && (
                     <Link href={`/solicitar?id=${r.id}`}>
                       <Button size="sm" variant="outline" className="border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-indigo-600 hover:text-white">
                         <Pencil className="mr-2 h-4 w-4" /> Editar
@@ -333,7 +333,7 @@ export default function MisRecibos() {
                       <Button size="sm"><Pencil className="mr-2 h-4 w-4" /> Corregir y reenviar</Button>
                     </Link>
                   )}
-                  {r.status === "aprobada" && (
+                  {(r.status === "aprobada" || r.status === "corregida") && (
                     <>
                       <Button size="sm" variant="outline" className="border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-blue-600 hover:text-white" onClick={() => previewPdf(r)}>
                         <Eye className="mr-2 h-4 w-4" /> Vista previa
@@ -341,17 +341,23 @@ export default function MisRecibos() {
                       <Button size="sm" variant="outline" className="border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-blue-600 hover:text-white" onClick={() => downloadPdf(r)}>
                         <FileDown className="mr-2 h-4 w-4" /> Descargar PDF
                       </Button>
-                      <Link href={`/solicitar?id=${r.id}`}>
-                        <Button size="sm" variant="outline" className="border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-indigo-600 hover:text-white">
+                      {withinCorrectionWindow(r.approved_at) ? (
+                        <Link href={`/solicitar?id=${r.id}`}>
+                          <Button size="sm" variant="outline" className="border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-indigo-600 hover:text-white">
+                            <Wrench className="mr-2 h-4 w-4" /> Corregir
+                          </Button>
+                        </Link>
+                      ) : (
+                        <Button size="sm" variant="outline" disabled title="Ya pasaron más de 3 días desde la aprobación — no se puede corregir.">
                           <Wrench className="mr-2 h-4 w-4" /> Corregir
                         </Button>
-                      </Link>
+                      )}
                       <Button size="sm" variant="outline" className="border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-slate-600 hover:text-white" onClick={() => duplicar(r)}>
                         <Copy className="mr-2 h-4 w-4" /> Duplicar
                       </Button>
                     </>
                   )}
-                  {(r.status === "aprobada" || r.status === "rechazada") && (
+                  {(r.status === "aprobada" || r.status === "corregida" || r.status === "rechazada") && (
                     <Button size="sm" variant="destructive" className="ml-auto" onClick={() => archiveRequest(r)}>
                       <Trash2 className="mr-2 h-4 w-4" /> Eliminar
                     </Button>
@@ -394,7 +400,7 @@ function StatusBadge({ s }: { s: Status }) {
     pendiente: { label: "Pendiente", variant: "secondary" },
     aprobada: { label: "Aprobada", variant: "default" },
     rechazada: { label: "Rechazada", variant: "destructive" },
-    requiere_info: { label: "Requiere info", variant: "outline" },
+    corregida: { label: "Corregida", variant: "outline" },
   };
   const m = map[s];
   return <Badge variant={m.variant}>{m.label}</Badge>;

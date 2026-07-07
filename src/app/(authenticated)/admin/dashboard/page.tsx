@@ -7,7 +7,7 @@ import { useLiveRefresh } from "@/lib/use-live-refresh";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { FileText, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { FileText, CheckCircle2, Clock, XCircle, Wrench } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, AreaChart, Area, CartesianGrid,
@@ -31,9 +31,10 @@ interface Row {
 const STATUS_META: Record<string, { label: string; color: string; bg: string; text: string }> = {
   pendiente:  { label: "Pendiente",  color: "#F59E0B", bg: "#FEF3C7", text: "#92400E" },
   aprobada:   { label: "Aprobada",   color: "#10B981", bg: "#D1FAE5", text: "#065F46" },
+  corregida:  { label: "Corregida",  color: "#3B82F6", bg: "#DBEAFE", text: "#1E40AF" },
   rechazada:  { label: "Rechazada",  color: "#EF4444", bg: "#FEE2E2", text: "#991B1B" },
 };
-const STATUSES = ["pendiente", "aprobada", "rechazada"] as const;
+const STATUSES = ["pendiente", "aprobada", "corregida", "rechazada"] as const;
 
 const DOC_META: Record<string, { label: string; color: string; bg: string }> = {
   orden_matricula:  { label: "Orden de Matrícula", color: "#6366F1", bg: "#EEF2FF" },
@@ -144,6 +145,7 @@ export default function Dashboard() {
     const totales = {
       total: filtered.length,
       aprobadas: filtered.filter((r) => r.status === "aprobada").length,
+      corregidas: filtered.filter((r) => r.status === "corregida").length,
       pendientes: filtered.filter((r) => r.status === "pendiente").length,
       rechazadas: filtered.filter((r) => r.status === "rechazada").length,
     };
@@ -189,10 +191,11 @@ export default function Dashboard() {
         <p className="mt-1 text-base text-muted-foreground">Estadísticas y métricas de solicitudes.</p>
       </div>
 
-      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard label="Total" value={totales.total}       icon={<FileText className="h-5 w-5" />}       accent="#6366F1" bg="#EEF2FF" />
         <StatCard label="Pendientes" value={totales.pendientes} icon={<Clock className="h-5 w-5" />}        accent="#F59E0B" bg="#FEF3C7" />
         <StatCard label="Aprobadas"  value={totales.aprobadas}  icon={<CheckCircle2 className="h-5 w-5" />} accent="#10B981" bg="#D1FAE5" />
+        <StatCard label="Corregidas" value={totales.corregidas} icon={<Wrench className="h-5 w-5" />}      accent="#3B82F6" bg="#DBEAFE" />
         <StatCard label="Rechazadas" value={totales.rechazadas} icon={<XCircle className="h-5 w-5" />}      accent="#EF4444" bg="#FEE2E2" />
       </div>
 
