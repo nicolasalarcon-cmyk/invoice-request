@@ -873,8 +873,8 @@ export default function AdminPanel() {
                   )}
 
                   <DetailSection title="Estado y seguimiento">
-                    <PreviewRow label="Comercial" value={previewing.comercial_nombre ?? "—"} />
-                    <PreviewRow label="Correo asesor" value={previewing.comercial_email ?? "—"} />
+                    <PreviewRow label="Líder Comercial" value={previewing.comercial_nombre ?? "—"} />
+                    <PreviewRow label="Correo Líder Comercial" value={previewing.comercial_email ?? "—"} />
                     <PreviewRow label="Asesor Comercial" value={previewing.asesor_nombre ?? "—"} />
                     <PreviewRow label="Creada" value={formatDate(previewing.created_at)} />
                     {previewing.approved_at && <PreviewRow label="Aprobada" value={formatDate(previewing.approved_at)} />}

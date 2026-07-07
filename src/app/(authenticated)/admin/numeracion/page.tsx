@@ -404,7 +404,7 @@ export default function Numeracion() {
                             <Detail label="N° Participantes"    value={r.numero_participantes != null ? String(r.numero_participantes) : null} />
                             <Detail label="Descuento"           value={r.descuento_pct > 0 ? `${r.descuento_pct}% · ${formatCOP(r.descuento)}` : null} />
                             <Detail label="Valor total empresa" value={r.valor_total_empresa != null ? formatCOP(r.valor_total_empresa) : null} />
-                            <Detail label="Email asesor"        value={r.comercial_email} />
+                            <Detail label="Correo Líder Comercial" value={r.comercial_email} />
                             <Detail label="Asesor Comercial"    value={r.asesor_nombre} />
 
                             {r.observaciones && (
