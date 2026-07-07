@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { formatCOP } from "@/lib/format";
 import { getFormConfig, type FormConfig } from "@/lib/form-config";
 import { listProgramas, type Programa } from "@/lib/programas";
+import { listAsesores, type Asesor } from "@/lib/asesores";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { listCohortesByNemonico, type CohorteRow } from "@/lib/sheets.functions";
@@ -28,6 +29,7 @@ interface FormState {
   nombre: string;
   identificacion: string;
   email: string;
+  asesor_nombre: string;
   tipo_financiacion: string;
   tipo_programa: string;
   programa: string;
@@ -52,7 +54,7 @@ interface FormState {
 }
 
 const EMPTY: FormState = {
-  nombre: "", identificacion: "", email: "", tipo_financiacion: "",
+  nombre: "", identificacion: "", email: "", asesor_nombre: "", tipo_financiacion: "",
   tipo_programa: "Diplomado", programa: "", programa_nemonico: "",
   codigo_snies: "", cohorte: "", plan_estudio: "",
   fecha_inicio: "", fecha_fin: "", horas_programa: "",
@@ -93,11 +95,22 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
   const [cohortes, setCohortes] = useState<CohorteRow[]>([]);
   const [loadingCohortes, setLoadingCohortes] = useState(false);
   const [manualProg, setManualProg] = useState(false);
+  const [asesores, setAsesores] = useState<Asesor[]>([]);
 
   useEffect(() => {
     getFormConfig().then(setCfg);
     listProgramas().then(setProgramas).catch(() => setProgramas([]));
+    listAsesores().then(setAsesores).catch(() => setAsesores([]));
   }, []);
+
+  // El jefe de área siempre puede asignarse a sí mismo, aunque no esté en el catálogo.
+  const asesorOptions = useMemo(() => {
+    const nombres = new Set(asesores.map((a) => a.nombre));
+    const propio = profile?.nombre_completo;
+    return propio && !nombres.has(propio)
+      ? [...asesores, { id: "self", nombre: propio, activo: true }]
+      : asesores;
+  }, [asesores, profile]);
 
   const loadFormData = async (sourceId: string, isEdit: boolean) => {
     const { data, error } = await supabase.from("invoice_requests").select("*").eq("id", sourceId).maybeSingle();
@@ -112,6 +125,7 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
       nombre: data.nombre ?? "",
       identificacion: data.identificacion ?? "",
       email: data.email ?? "",
+      asesor_nombre: (d.asesor_nombre as string) ?? "",
       tipo_financiacion: (d.tipo_persona as string) ?? "",
       tipo_programa: data.tipo_programa ?? "Diplomado",
       programa: data.programa ?? "",
@@ -216,6 +230,10 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
       toast.error("Escribe el concepto personalizado.");
       return;
     }
+    if (!form.asesor_nombre) {
+      toast.error("Selecciona el asesor comercial correspondiente.");
+      return;
+    }
     setBusy(true);
     try {
       const approveNow = isAdmin && autoApprove && !editId;
@@ -229,6 +247,7 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
         nombre: form.nombre,
         identificacion: form.identificacion,
         email: form.email || null,
+        asesor_nombre: form.asesor_nombre,
         tipo_programa: form.tipo_programa,
         programa: form.programa || form.tipo_programa,
         codigo_snies: form.codigo_snies || null,
@@ -332,7 +351,7 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <Section title="Datos del comercial">
+      <Section title="Datos del Líder Comercial">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Nombre Completo">
             <Input value={profile?.nombre_completo ?? ""} disabled />
@@ -341,6 +360,19 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
             <Input value={profile?.email ?? user?.email ?? ""} disabled />
           </Field>
         </div>
+      </Section>
+
+      <Section title="Asignar Asesor">
+        <Field label="Asesor Comercial *">
+          <Select value={form.asesor_nombre} onValueChange={(v) => update("asesor_nombre", v)}>
+            <SelectTrigger><SelectValue placeholder="Selecciona el asesor" /></SelectTrigger>
+            <SelectContent>
+              {asesorOptions.map((a) => (
+                <SelectItem key={a.id} value={a.nombre}>{a.nombre}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
       </Section>
 
       <Section title="Datos del estudiante">

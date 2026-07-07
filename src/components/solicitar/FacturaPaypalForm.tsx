@@ -1,5 +1,5 @@
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { AttachmentsField, type AttachmentItem } from "./AttachmentsField";
 import { listProgramas, type Programa } from "@/lib/programas";
+import { listAsesores, type Asesor } from "@/lib/asesores";
 import { listCohortesByNemonico, type CohorteRow } from "@/lib/sheets.functions";
 import type { Json } from "@/integrations/supabase/types";
 
@@ -31,6 +32,7 @@ const EMPTY_PARTICIPANT: Participant = { nombre: "", cedula: "", email: "", tele
 
 interface PpForm {
   tipo_persona: TipoPersona;
+  asesor_nombre: string;
   // Persona Natural
   nombre: string;
   cedula: string;
@@ -57,6 +59,7 @@ interface PpForm {
 
 const EMPTY: PpForm = {
   tipo_persona: "Persona Natural",
+  asesor_nombre: "",
   nombre: "", cedula: "", email_natural: "", telefono_natural: "",
   empresa: "", nit: "", email_empresa: "", pais: "", direccion: "", ciudad: "", telefono: "",
   numero_participantes: "",
@@ -79,10 +82,21 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
   const [cohortes, setCohortes] = useState<CohorteRow[]>([]);
   const [loadingCohortes, setLoadingCohortes] = useState(false);
   const [manualProg, setManualProg] = useState(false);
+  const [asesores, setAsesores] = useState<Asesor[]>([]);
 
   useEffect(() => {
     listProgramas().then(setProgramas).catch(() => setProgramas([]));
+    listAsesores().then(setAsesores).catch(() => setAsesores([]));
   }, []);
+
+  // El jefe de área siempre puede asignarse a sí mismo, aunque no esté en el catálogo.
+  const asesorOptions = useMemo(() => {
+    const nombres = new Set(asesores.map((a) => a.nombre));
+    const propio = profile?.nombre_completo;
+    return propio && !nombres.has(propio)
+      ? [...asesores, { id: "self", nombre: propio, activo: true }]
+      : asesores;
+  }, [asesores, profile]);
 
   const loadFormData = async (sourceId: string, isEdit: boolean) => {
     const { data, error } = await supabase.from("invoice_requests").select("*").eq("id", sourceId).maybeSingle();
@@ -97,6 +111,7 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
     const isNatural = tipoPersona === "Persona Natural";
     setForm({
       tipo_persona: tipoPersona,
+      asesor_nombre: (d.asesor_nombre as string) ?? "",
       nombre: isNatural ? (data.nombre ?? "") : "",
       cedula: isNatural ? (data.identificacion ?? "") : "",
       email_natural: isNatural ? (data.email ?? "") : "",
@@ -171,6 +186,7 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
     e.preventDefault();
     if (!user) return;
     if (!form.tipo_persona) { toast.error("Selecciona el tipo de persona."); return; }
+    if (!form.asesor_nombre) { toast.error("Selecciona el asesor comercial correspondiente."); return; }
     setBusy(true);
     try {
       const periodo = `${new Date().getFullYear()}`;
@@ -180,6 +196,7 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
       const payload = {
         document_type: "factura_paypal",
         tipo_persona: form.tipo_persona,
+        asesor_nombre: form.asesor_nombre,
         nombre: isNatural ? form.nombre : form.empresa,
         identificacion: isNatural ? form.cedula : (form.nit || form.empresa.slice(0, 20)),
         email: isNatural ? (form.email_natural || null) : (form.email_empresa || null),
@@ -284,7 +301,7 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
     <form onSubmit={handleSubmit} className="space-y-6">
 
       {/* ── COMERCIAL ── */}
-      <Section title="Datos del comercial">
+      <Section title="Datos del Líder Comercial">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Nombre Completo">
             <Input value={profile?.nombre_completo ?? ""} disabled />
@@ -293,6 +310,19 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
             <Input value={profile?.email ?? user?.email ?? ""} disabled />
           </Field>
         </div>
+      </Section>
+
+      <Section title="Asignar Asesor">
+        <Field label="Asesor Comercial *">
+          <Select value={form.asesor_nombre} onValueChange={(v) => update("asesor_nombre", v)}>
+            <SelectTrigger><SelectValue placeholder="Selecciona el asesor" /></SelectTrigger>
+            <SelectContent>
+              {asesorOptions.map((a) => (
+                <SelectItem key={a.id} value={a.nombre}>{a.nombre}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
       </Section>
 
       {/* ── TIPO DE PERSONA ── */}

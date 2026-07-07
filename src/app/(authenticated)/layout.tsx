@@ -156,6 +156,9 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
             {canManagePrograms && (
               <NavTab href="/admin/programas" icon={<BookOpen className="h-3.5 w-3.5" />} label="Programas" small />
             )}
+            {canManagePrograms && (
+              <NavTab href="/admin/asesores" icon={<Users className="h-3.5 w-3.5" />} label="Asesores" small />
+            )}
             {canManageTemplates && (
               <NavTab href="/admin/plantillas" icon={<LayoutTemplate className="h-3.5 w-3.5" />} label="Plantillas" small />
             )}

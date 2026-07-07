@@ -51,6 +51,7 @@ interface Req {
   rejection_reason: string | null;
   info_requested: string | null;
   comercial_nombre: string | null;
+  asesor_nombre: string | null;
   template_id: string | null;
   codigo_estudiante: string | null;
   codigo_snies: string | null;

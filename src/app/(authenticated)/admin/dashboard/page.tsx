@@ -16,6 +16,7 @@ import {
 interface Row {
   status: string;
   comercial_nombre: string | null;
+  asesor_nombre: string | null;
   nombre: string;
   identificacion: string;
   recibo_numero: string | null;
@@ -74,7 +75,7 @@ export default function Dashboard() {
   const load = async () => {
     const { data } = await supabase
       .from("invoice_requests")
-      .select("status,comercial_nombre,nombre,identificacion,recibo_numero,programa,periodo,document_type,valor_total,created_at,rejection_reason");
+      .select("status,comercial_nombre,asesor_nombre,nombre,identificacion,recibo_numero,programa,periodo,document_type,valor_total,created_at,rejection_reason");
     setRows((data ?? []) as Row[]);
     setLoading(false);
   };
@@ -102,7 +103,7 @@ export default function Dashboard() {
     });
   }, [rows, q, statusSel, docSel, desde, hasta]);
 
-  const { byStatus, byDocType, byComercial, byRejectReason, byComercialRejected, timeline, totales } = useMemo(() => {
+  const { byStatus, byDocType, byComercial, byAsesor, byRejectReason, byComercialRejected, timeline, totales } = useMemo(() => {
     const statusMap = new Map<string, number>();
     filtered.forEach((r) => statusMap.set(r.status, (statusMap.get(r.status) ?? 0) + 1));
     const byStatus = Array.from(statusMap, ([name, value]) => ({ name, value }));
@@ -120,6 +121,15 @@ export default function Dashboard() {
       comMap.set(k, (comMap.get(k) ?? 0) + 1);
     });
     const byComercial = Array.from(comMap, ([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 8);
+
+    const asesorMap = new Map<string, number>();
+    filtered.forEach((r) => {
+      const k = r.asesor_nombre ?? "Sin asignar";
+      asesorMap.set(k, (asesorMap.get(k) ?? 0) + 1);
+    });
+    const byAsesor = Array.from(asesorMap, ([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 8);
 
@@ -157,7 +167,7 @@ export default function Dashboard() {
       .sort((a, b) => b.value - a.value)
       .slice(0, 8);
 
-    return { byStatus, byDocType, byComercial, byRejectReason, byComercialRejected, timeline, totales };
+    return { byStatus, byDocType, byComercial, byAsesor, byRejectReason, byComercialRejected, timeline, totales };
   }, [filtered]);
 
   const toggle = (arr: string[], setArr: (v: string[]) => void, v: string) =>
@@ -358,6 +368,34 @@ export default function Dashboard() {
               <Bar dataKey="value" radius={[0, 6, 6, 0]} maxBarSize={22}>
                 {byComercial.map((_, i) => (
                   <Cell key={i} fill={`url(#gradCom${i})`} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        <ChartCard title="Ranking por Asesor" subtitle="Por número de solicitudes">
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={byAsesor} layout="vertical" margin={{ top: 5, right: 16, left: 8, bottom: 5 }}>
+              <defs>
+                {byAsesor.map((_, i) => {
+                  const c = COMERCIAL_PALETTE[i % COMERCIAL_PALETTE.length];
+                  return (
+                    <linearGradient key={i} id={`gradAse${i}`} x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor={c} stopOpacity={1} />
+                      <stop offset="100%" stopColor={c} stopOpacity={0.55} />
+                    </linearGradient>
+                  );
+                })}
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+              <XAxis type="number" allowDecimals={false} fontSize={10} tick={{ fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+              <YAxis type="category" dataKey="name" width={96} fontSize={10} tick={{ fill: "#64748b" }} axisLine={false} tickLine={false}
+                tickFormatter={(v: string) => v.length > 14 ? v.slice(0, 13) + "…" : v} />
+              <Tooltip content={<ChartTooltip />} />
+              <Bar dataKey="value" radius={[0, 6, 6, 0]} maxBarSize={22}>
+                {byAsesor.map((_, i) => (
+                  <Cell key={i} fill={`url(#gradAse${i})`} />
                 ))}
               </Bar>
             </BarChart>

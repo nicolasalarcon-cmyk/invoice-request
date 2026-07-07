@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { formatCOP } from "@/lib/format";
 import { AttachmentsField, type AttachmentItem } from "./AttachmentsField";
 import { listProgramas, type Programa } from "@/lib/programas";
+import { listAsesores, type Asesor } from "@/lib/asesores";
 import { listCohortesByNemonico, type CohorteRow } from "@/lib/sheets.functions";
 import type { Json } from "@/integrations/supabase/types";
 
@@ -33,6 +34,7 @@ const EMPTY_PARTICIPANT: Participant = { nombre: "", cedula: "", email: "", tele
 
 interface CoForm {
   tipo_persona: TipoPersona;
+  asesor_nombre: string;
   // Persona Natural
   nombre: string;
   cedula: string;
@@ -60,6 +62,7 @@ interface CoForm {
 
 const EMPTY: CoForm = {
   tipo_persona: "",
+  asesor_nombre: "",
   nombre: "", cedula: "", email_natural: "", telefono_natural: "",
   empresa: "", nit: "", email_empresa: "", pais: "Colombia", direccion: "",
   ciudad: "", telefono: "", numero_participantes: "",
@@ -83,10 +86,21 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
   const [loadingCohortes, setLoadingCohortes] = useState(false);
   const [manualProg, setManualProg] = useState(false);
   const [tipoProgramaFiltro, setTipoProgramaFiltro] = useState("");
+  const [asesores, setAsesores] = useState<Asesor[]>([]);
 
   useEffect(() => {
     listProgramas().then(setProgramas).catch(() => setProgramas([]));
+    listAsesores().then(setAsesores).catch(() => setAsesores([]));
   }, []);
+
+  // El jefe de área siempre puede asignarse a sí mismo, aunque no esté en el catálogo.
+  const asesorOptions = useMemo(() => {
+    const nombres = new Set(asesores.map((a) => a.nombre));
+    const propio = profile?.nombre_completo;
+    return propio && !nombres.has(propio)
+      ? [...asesores, { id: "self", nombre: propio, activo: true }]
+      : asesores;
+  }, [asesores, profile]);
 
   const tiposProgramaDisponibles = useMemo(
     () => [...new Set(programas.map((p) => p.tipo_programa).filter((t): t is string => !!t))].sort(),
@@ -106,6 +120,7 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
     const isNatural = tipoPersona === "Persona Natural";
     setForm({
       tipo_persona: tipoPersona,
+      asesor_nombre: (d.asesor_nombre as string) ?? "",
       nombre: data.nombre ?? "",
       cedula: data.identificacion ?? "",
       email_natural: isNatural ? (data.email ?? "") : "",
@@ -187,6 +202,7 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
     e.preventDefault();
     if (!user) return;
     if (!form.tipo_persona) { toast.error("Selecciona el tipo de persona."); return; }
+    if (!form.asesor_nombre) { toast.error("Selecciona el asesor comercial correspondiente."); return; }
     setBusy(true);
     try {
       const today = new Date();
@@ -197,6 +213,7 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
       const payload = {
         document_type: "factura_colombia",
         tipo_persona: form.tipo_persona,
+        asesor_nombre: form.asesor_nombre,
         nombre: isNatural ? form.nombre : form.empresa,
         identificacion: isNatural ? form.cedula : (form.nit || form.empresa.slice(0, 20)),
         email: isNatural ? (form.email_natural || null) : (form.email_empresa || null),
@@ -302,7 +319,7 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
     <form onSubmit={handleSubmit} className="space-y-6">
 
       {/* ── COMERCIAL ── */}
-      <Section title="Datos del comercial">
+      <Section title="Datos del Líder Comercial">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Nombre Completo">
             <Input value={profile?.nombre_completo ?? ""} disabled />
@@ -311,6 +328,19 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
             <Input value={profile?.email ?? user?.email ?? ""} disabled />
           </Field>
         </div>
+      </Section>
+
+      <Section title="Asignar Asesor">
+        <Field label="Asesor Comercial *">
+          <Select value={form.asesor_nombre} onValueChange={(v) => update("asesor_nombre", v)}>
+            <SelectTrigger><SelectValue placeholder="Selecciona el asesor" /></SelectTrigger>
+            <SelectContent>
+              {asesorOptions.map((a) => (
+                <SelectItem key={a.id} value={a.nombre}>{a.nombre}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
       </Section>
 
       {/* ── TIPO DE PERSONA ── */}

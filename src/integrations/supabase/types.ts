@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      asesores: {
+        Row: {
+          activo: boolean
+          created_at: string
+          id: string
+          nombre: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          id?: string
+          nombre: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          id?: string
+          nombre?: string
+        }
+        Relationships: []
+      }
       form_config: {
         Row: {
           config: Json
@@ -89,6 +110,7 @@ export type Database = {
           approved_by: string | null
           approved_pdf_path: string | null
           archived_by_comercial: boolean
+          asesor_nombre: string | null
           attachments: Json
           ciudad: string | null
           codigo_estudiante: string | null
@@ -150,6 +172,7 @@ export type Database = {
           approved_by?: string | null
           approved_pdf_path?: string | null
           archived_by_comercial?: boolean
+          asesor_nombre?: string | null
           attachments?: Json
           ciudad?: string | null
           codigo_estudiante?: string | null
@@ -211,6 +234,7 @@ export type Database = {
           approved_by?: string | null
           approved_pdf_path?: string | null
           archived_by_comercial?: boolean
+          asesor_nombre?: string | null
           attachments?: Json
           ciudad?: string | null
           codigo_estudiante?: string | null

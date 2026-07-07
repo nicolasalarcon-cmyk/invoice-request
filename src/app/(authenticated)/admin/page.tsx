@@ -90,6 +90,7 @@ interface Req {
   info_requested: string | null;
   comercial_nombre: string | null;
   comercial_email: string | null;
+  asesor_nombre: string | null;
   template_id: string | null;
   parent_id: string | null;
   attachments: AttachmentItem[] | null;
@@ -553,6 +554,9 @@ export default function AdminPanel() {
                       {r.comercial_nombre && (
                         <p className="text-xs text-muted-foreground">Comercial: {r.comercial_nombre} ({r.comercial_email})</p>
                       )}
+                      {r.asesor_nombre && (
+                        <p className="text-xs text-muted-foreground">Asesor: {r.asesor_nombre}</p>
+                      )}
                       {r.observaciones && (
                         <p className="mt-2 rounded bg-muted px-2 py-1 text-xs text-foreground">Obs: {r.observaciones}</p>
                       )}
@@ -871,6 +875,7 @@ export default function AdminPanel() {
                   <DetailSection title="Estado y seguimiento">
                     <PreviewRow label="Comercial" value={previewing.comercial_nombre ?? "—"} />
                     <PreviewRow label="Correo asesor" value={previewing.comercial_email ?? "—"} />
+                    <PreviewRow label="Asesor Comercial" value={previewing.asesor_nombre ?? "—"} />
                     <PreviewRow label="Creada" value={formatDate(previewing.created_at)} />
                     {previewing.approved_at && <PreviewRow label="Aprobada" value={formatDate(previewing.approved_at)} />}
                     {previewing.observaciones && (

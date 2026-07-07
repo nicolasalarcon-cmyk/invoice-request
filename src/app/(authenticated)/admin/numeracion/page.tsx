@@ -66,6 +66,7 @@ interface Row {
   rejection_reason: string | null;
   comercial_nombre: string | null;
   comercial_email: string | null;
+  asesor_nombre: string | null;
   approved_at: string | null;
   approved_pdf_path: string | null;
   attachments: Attachment[];
@@ -116,7 +117,7 @@ export default function Numeracion() {
         programa,concepto,tipo_programa,cohorte,fecha_inicio,fecha_limite_pago,
         pais,direccion,ciudad,numero_participantes,matricula,
         descuento_pct,descuento,valor_total,valor_total_empresa,
-        observaciones,rejection_reason,comercial_nombre,comercial_email,
+        observaciones,rejection_reason,comercial_nombre,comercial_email,asesor_nombre,
         approved_at,approved_pdf_path,attachments,participantes
       `)
       .order("created_at", { ascending: false });
@@ -245,8 +246,9 @@ export default function Numeracion() {
       "Descuento valor":      r.descuento,
       "Valor por participante": Number(r.valor_total),
       "Valor empresa":        r.valor_total_empresa ?? "",
-      "Asesor":               r.comercial_nombre ?? "",
-      "Email asesor":         r.comercial_email ?? "",
+      "Comercial":            r.comercial_nombre ?? "",
+      "Email comercial":      r.comercial_email ?? "",
+      "Asesor Comercial":     r.asesor_nombre ?? "",
       "Observaciones":        r.observaciones ?? "",
       "Motivo de rechazo":    r.rejection_reason ?? "",
     }));
@@ -403,6 +405,7 @@ export default function Numeracion() {
                             <Detail label="Descuento"           value={r.descuento_pct > 0 ? `${r.descuento_pct}% · ${formatCOP(r.descuento)}` : null} />
                             <Detail label="Valor total empresa" value={r.valor_total_empresa != null ? formatCOP(r.valor_total_empresa) : null} />
                             <Detail label="Email asesor"        value={r.comercial_email} />
+                            <Detail label="Asesor Comercial"    value={r.asesor_nombre} />
 
                             {r.observaciones && (
                               <div className="space-y-0.5 sm:col-span-2 lg:col-span-3 xl:col-span-4">
