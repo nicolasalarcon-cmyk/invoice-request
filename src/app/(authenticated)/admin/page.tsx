@@ -364,9 +364,10 @@ export default function AdminPanel() {
     }
     if (!(await assertNotStale(rejecting))) return;
     const opt = REJECT_OPTIONS.find(o => o.category === rejectCategory);
+    const extra = rejectOtherText.trim();
     const reason = rejectCategory === "Otra razón"
-      ? `Otra razón — ${rejectOtherText.trim()}`
-      : `${rejectCategory} — ${opt?.description ?? ""}`;
+      ? `Otra razón — ${extra}`
+      : `${rejectCategory} — ${opt?.description ?? ""}${extra ? ` · ${extra}` : ""}`;
     const { error } = await supabase
       .from("invoice_requests")
       .update({ status: "rechazada", rejection_reason: reason })
@@ -585,7 +586,13 @@ export default function AdminPanel() {
                           const match = REJECT_OPTIONS.find(o => existing.startsWith(o.category));
                           if (match) {
                             setRejectCategory(match.category);
-                            setRejectOtherText(match.category === "Otra razón" ? existing.replace("Otra razón — ", "") : "");
+                            if (match.category === "Otra razón") {
+                              setRejectOtherText(existing.replace("Otra razón — ", ""));
+                            } else {
+                              const prefix = `${match.category} — ${match.description ?? ""}`;
+                              const rest = existing.startsWith(prefix) ? existing.slice(prefix.length) : "";
+                              setRejectOtherText(rest.startsWith(" · ") ? rest.slice(3) : "");
+                            }
                           } else if (existing) {
                             setRejectCategory("Otra razón");
                             setRejectOtherText(existing);
@@ -739,12 +746,12 @@ export default function AdminPanel() {
                 </div>
               </label>
             ))}
-            {rejectCategory === "Otra razón" && (
+            {rejectCategory && (
               <Textarea
                 rows={3}
                 value={rejectOtherText}
                 onChange={(e) => setRejectOtherText(e.target.value)}
-                placeholder="Describe el motivo específico..."
+                placeholder={rejectCategory === "Otra razón" ? "Describe el motivo específico..." : "Agrega detalles adicionales para el comercial (opcional)..."}
                 className="mt-1"
                 autoFocus
               />
