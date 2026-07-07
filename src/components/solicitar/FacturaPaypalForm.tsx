@@ -56,7 +56,7 @@ interface PpForm {
 }
 
 const EMPTY: PpForm = {
-  tipo_persona: "",
+  tipo_persona: "Persona Natural",
   nombre: "", cedula: "", email_natural: "", telefono_natural: "",
   empresa: "", nit: "", email_empresa: "", pais: "", direccion: "", ciudad: "", telefono: "",
   numero_participantes: "",
@@ -296,9 +296,11 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
       </Section>
 
       {/* ── TIPO DE PERSONA ── */}
+      {/* Restricción temporal: Factura PayPal solo admite Persona Natural por ahora.
+          Quitar el "disabled" reactiva Persona Jurídica cuando se habilite. */}
       <Section title="Tipo de persona">
         <Field label="Selecciona el tipo de persona *">
-          <Select value={form.tipo_persona} onValueChange={(v) => update("tipo_persona", v as TipoPersona)}>
+          <Select value={form.tipo_persona} onValueChange={(v) => update("tipo_persona", v as TipoPersona)} disabled>
             <SelectTrigger><SelectValue placeholder="Selecciona una opción…" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="Persona Natural">Persona Natural</SelectItem>

@@ -84,15 +84,22 @@ export function FacturaUsaForm({ editId, duplicateFromId }: { editId?: string; d
   const [cohortes, setCohortes] = useState<CohorteRow[]>([]);
   const [loadingCohortes, setLoadingCohortes] = useState(false);
   const [manualProg, setManualProg] = useState(false);
-  const [tipoProgramaFiltro, setTipoProgramaFiltro] = useState("");
+  const [tipoProgramaFiltro, setTipoProgramaFiltro] = useState("Diplomado");
 
   useEffect(() => {
     listProgramas().then(setProgramas).catch(() => setProgramas([]));
   }, []);
 
-  const tiposProgramaDisponibles = useMemo(
-    () => [...new Set(programas.map((p) => p.tipo_programa).filter((t): t is string => !!t))].sort(),
+  // Restricción temporal: Factura USA solo ofrece Diplomados por ahora.
+  // Quitar este filtro reactiva Especialización cuando se habilite.
+  const programasUsa = useMemo(
+    () => programas.filter((p) => !(p.tipo_programa ?? "").toLowerCase().includes("especial")),
     [programas],
+  );
+
+  const tiposProgramaDisponibles = useMemo(
+    () => [...new Set(programasUsa.map((p) => p.tipo_programa).filter((t): t is string => !!t))].sort(),
+    [programasUsa],
   );
 
   const loadFormData = async (sourceId: string, isEdit: boolean) => {
@@ -413,7 +420,8 @@ export function FacturaUsaForm({ editId, duplicateFromId }: { editId?: string; d
           <Section title="Datos del programa">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Tipo de programa">
-                <Select value={tipoProgramaFiltro || "__todos"} onValueChange={(v) => setTipoProgramaFiltro(v === "__todos" ? "" : v)}>
+                {/* Restricción temporal: bloqueado en "Diplomado" hasta que se habilite Especialización. */}
+                <Select value={tipoProgramaFiltro || "__todos"} onValueChange={(v) => setTipoProgramaFiltro(v === "__todos" ? "" : v)} disabled>
                   <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__todos">Todos</SelectItem>
@@ -434,10 +442,10 @@ export function FacturaUsaForm({ editId, duplicateFromId }: { editId?: string; d
                       <CommandInput placeholder="Buscar por nemónico o nombre…" />
                       <CommandList className="max-h-72 overflow-y-auto">
                         <CommandEmpty>
-                          {programas.length === 0 ? "Aún no hay programas en el catálogo." : "Sin resultados."}
+                          {programasUsa.length === 0 ? "Aún no hay programas en el catálogo." : "Sin resultados."}
                         </CommandEmpty>
                         <CommandGroup>
-                          {programas
+                          {programasUsa
                             .filter((p) => !tipoProgramaFiltro || p.tipo_programa === tipoProgramaFiltro)
                             .map((p) => {
                             const snies = p.codigo_snies?.match(/\b(\d{5,7})\b/)?.[1] ?? null;
