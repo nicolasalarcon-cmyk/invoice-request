@@ -21,7 +21,7 @@ import { listAsesores, type Asesor } from "@/lib/asesores";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { listCohortesByNemonico, type CohorteRow } from "@/lib/sheets.functions";
-import { AttachmentsField, type AttachmentItem } from "./AttachmentsField";
+import { AttachmentsField, HistoricalAttachmentsList, type AttachmentItem } from "./AttachmentsField";
 
 const CONCEPTOS_FIJOS = ["Matrícula", "Matrícula Parcial", "Otro"] as const;
 
@@ -88,6 +88,7 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
   const [cfg, setCfg] = useState<FormConfig | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY);
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
+  const [historicalAttachments, setHistoricalAttachments] = useState<AttachmentItem[]>([]);
   const [originalStatus, setOriginalStatus] = useState<string | null>(null);
   const [originalReciboNumero, setOriginalReciboNumero] = useState<string | null>(null);
   const [originalApprovedAt, setOriginalApprovedAt] = useState<string | null>(null);
@@ -119,7 +120,16 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
     if (isEdit) { setOriginalStatus(data.status); setOriginalReciboNumero(data.recibo_numero ?? null); setOriginalApprovedAt(data.approved_at ?? null); }
     const d = data as Record<string, unknown>;
     const att = (d.attachments as AttachmentItem[] | null) ?? [];
-    setAttachments(Array.isArray(att) ? att : []);
+    const attArr = Array.isArray(att) ? att : [];
+    if (isEdit && data.status === "rechazada") {
+      // Los adjuntos de una solicitud rechazada quedan como historial/soporte:
+      // no se cargan como editables, para que no se puedan borrar al corregir.
+      setHistoricalAttachments(attArr);
+      setAttachments([]);
+    } else {
+      setAttachments(attArr);
+      setHistoricalAttachments([]);
+    }
     const conceptoRaw = data.concepto ?? "Matrícula";
     const isFijo = (CONCEPTOS_FIJOS as readonly string[]).includes(conceptoRaw);
     setForm({
@@ -587,9 +597,12 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
       </Section>
 
       <Section title="Adjuntos">
-        {user && (
-          <AttachmentsField value={attachments} onChange={setAttachments} userId={user.id} disabled={busy} />
-        )}
+        <div className="space-y-4">
+          {isAdmin && <HistoricalAttachmentsList items={historicalAttachments} />}
+          {user && (
+            <AttachmentsField value={attachments} onChange={setAttachments} userId={user.id} disabled={busy} />
+          )}
+        </div>
       </Section>
 
       {fieldVisible("observaciones") && (

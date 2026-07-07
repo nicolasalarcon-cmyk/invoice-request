@@ -255,6 +255,23 @@ export default function AdminPanel() {
     return true;
   };
 
+  // Al aprobar (definitivamente) una solicitud que viene de una corrección,
+  // los archivos de la solicitud anterior (rechazada) ya cumplieron su función
+  // de soporte durante la revisión — se eliminan de Storage y de la base para
+  // no acumular versiones viejas, dejando solo los últimos archivos subidos.
+  const purgeSupersededAttachments = async (r: Req) => {
+    if (!r.parent_id) return;
+    const parent = itemsById.get(r.parent_id);
+    if (!parent) return;
+    const paths = [
+      ...(parent.attachments ?? []).map((a) => a.path),
+      ...(parent.approved_pdf_path ? [parent.approved_pdf_path] : []),
+    ];
+    if (paths.length === 0) return;
+    await supabase.storage.from("invoice-files").remove(paths).catch(() => {});
+    await supabase.from("invoice_requests").update({ attachments: [], approved_pdf_path: null }).eq("id", parent.id);
+  };
+
   const confirmApproveUpload = async () => {
     if (!approving) return;
     const r = approving;
@@ -291,6 +308,7 @@ export default function AdminPanel() {
         })
         .eq("id", r.id);
       if (error) throw error;
+      await purgeSupersededAttachments(r);
       toast.success(pdfPath ? "Solicitud aprobada con PDF adjunto" : "Solicitud aprobada");
       if (r.comercial_email) {
         try {
@@ -335,6 +353,7 @@ export default function AdminPanel() {
       })
       .eq("id", r.id);
     if (error) return toast.error(error.message);
+    await purgeSupersededAttachments(r);
     toast.success("Solicitud aprobada");
 
     if (r.comercial_email) {
@@ -908,34 +927,65 @@ export default function AdminPanel() {
                     )}
                   </DetailSection>
 
-                  {((previewing.attachments && previewing.attachments.length > 0) || previewing.approved_pdf_path) && (
-                    <DetailSection title="Adjuntos" noGrid>
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        {previewing.attachments?.map((a) => (
-                          <button
-                            key={a.path}
-                            type="button"
-                            onClick={() => openAttachment(a.path)}
-                            className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-left text-xs hover:bg-muted/60 transition-colors"
-                          >
-                            <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                            <span className="min-w-0 flex-1 truncate font-medium text-foreground">{a.name}</span>
-                            <span className="shrink-0 text-muted-foreground">{(a.size / 1024).toFixed(0)} KB</span>
-                          </button>
-                        ))}
-                        {previewing.approved_pdf_path && (
-                          <button
-                            type="button"
-                            onClick={() => openAttachment(previewing.approved_pdf_path!)}
-                            className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-left text-xs hover:bg-blue-100 transition-colors"
-                          >
-                            <FileDown className="h-4 w-4 shrink-0 text-blue-700" />
-                            <span className="min-w-0 flex-1 truncate font-medium text-blue-700">PDF oficial aprobado</span>
-                          </button>
-                        )}
-                      </div>
-                    </DetailSection>
-                  )}
+                  {(() => {
+                    const historicalAttachments = previewing.parent_id
+                      ? itemsById.get(previewing.parent_id)?.attachments ?? []
+                      : [];
+                    const hasCurrent = (previewing.attachments && previewing.attachments.length > 0) || previewing.approved_pdf_path;
+                    const hasHistorical = historicalAttachments.length > 0;
+                    if (!hasCurrent && !hasHistorical) return null;
+                    return (
+                      <DetailSection title="Adjuntos" noGrid>
+                        <div className="space-y-3">
+                          {hasHistorical && (
+                            <div className="space-y-1.5">
+                              <p className="text-xs font-medium text-muted-foreground">
+                                Archivos de la solicitud rechazada original (historial)
+                              </p>
+                              <div className="grid gap-2 sm:grid-cols-2">
+                                {historicalAttachments.map((a) => (
+                                  <button
+                                    key={a.path}
+                                    type="button"
+                                    onClick={() => openAttachment(a.path)}
+                                    className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-left text-xs hover:bg-muted/60 transition-colors"
+                                  >
+                                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <span className="min-w-0 flex-1 truncate font-medium text-foreground">{a.name}</span>
+                                    <span className="shrink-0 text-muted-foreground">{(a.size / 1024).toFixed(0)} KB</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            {previewing.attachments?.map((a) => (
+                              <button
+                                key={a.path}
+                                type="button"
+                                onClick={() => openAttachment(a.path)}
+                                className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-left text-xs hover:bg-muted/60 transition-colors"
+                              >
+                                <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                <span className="min-w-0 flex-1 truncate font-medium text-foreground">{a.name}</span>
+                                <span className="shrink-0 text-muted-foreground">{(a.size / 1024).toFixed(0)} KB</span>
+                              </button>
+                            ))}
+                            {previewing.approved_pdf_path && (
+                              <button
+                                type="button"
+                                onClick={() => openAttachment(previewing.approved_pdf_path!)}
+                                className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-left text-xs hover:bg-blue-100 transition-colors"
+                              >
+                                <FileDown className="h-4 w-4 shrink-0 text-blue-700" />
+                                <span className="min-w-0 flex-1 truncate font-medium text-blue-700">PDF oficial aprobado</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </DetailSection>
+                    );
+                  })()}
                 </div>
               </>
             );

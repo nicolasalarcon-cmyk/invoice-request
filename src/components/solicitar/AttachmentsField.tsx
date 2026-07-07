@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Paperclip, X, FileText, Loader2 } from "lucide-react";
+import { Paperclip, X, FileText, Loader2, Lock } from "lucide-react";
 import { toast } from "sonner";
 
 export interface AttachmentItem {
@@ -123,6 +123,45 @@ export function AttachmentsField({
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+/**
+ * Lista de solo lectura para los adjuntos de la solicitud rechazada original:
+ * quedan como soporte/trazabilidad y no se pueden eliminar al corregir.
+ */
+export function HistoricalAttachmentsList({ items }: { items: AttachmentItem[] }) {
+  if (items.length === 0) return null;
+
+  const openFile = async (path: string) => {
+    const { data, error } = await supabase.storage.from("invoice-files").createSignedUrl(path, 60);
+    if (error || !data) return toast.error("No se pudo abrir el archivo");
+    window.open(data.signedUrl, "_blank");
+  };
+
+  return (
+    <div className="space-y-2">
+      <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+        <Lock className="h-3 w-3" /> Archivos de la solicitud rechazada original (no se pueden eliminar)
+      </p>
+      <ul className="divide-y divide-border rounded-md border border-border bg-muted/30">
+        {items.map((f) => (
+          <li key={f.path} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+            <button
+              type="button"
+              onClick={() => openFile(f.path)}
+              className="flex min-w-0 items-center gap-2 text-left hover:underline"
+            >
+              <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="truncate">{f.name}</span>
+              <span className="shrink-0 text-xs text-muted-foreground">
+                {(f.size / 1024).toFixed(0)} KB
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

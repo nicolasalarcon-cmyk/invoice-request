@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { AttachmentsField, type AttachmentItem } from "./AttachmentsField";
+import { AttachmentsField, HistoricalAttachmentsList, type AttachmentItem } from "./AttachmentsField";
 import { listProgramas, type Programa } from "@/lib/programas";
 import { listAsesores, type Asesor } from "@/lib/asesores";
 import { listCohortesByNemonico, type CohorteRow } from "@/lib/sheets.functions";
@@ -75,6 +75,7 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
   const [form, setForm] = useState<PpForm>(EMPTY);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
+  const [historicalAttachments, setHistoricalAttachments] = useState<AttachmentItem[]>([]);
   const [originalStatus, setOriginalStatus] = useState<string | null>(null);
   const [originalReciboNumero, setOriginalReciboNumero] = useState<string | null>(null);
   const [originalApprovedAt, setOriginalApprovedAt] = useState<string | null>(null);
@@ -105,7 +106,16 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
     const d = data as Record<string, unknown>;
     if (isEdit) { setOriginalStatus(data.status); setOriginalReciboNumero(data.recibo_numero ?? null); setOriginalApprovedAt(data.approved_at ?? null); }
     const att = (d.attachments as AttachmentItem[] | null) ?? [];
-    setAttachments(Array.isArray(att) ? att : []);
+    const attArr = Array.isArray(att) ? att : [];
+    if (isEdit && data.status === "rechazada") {
+      // Los adjuntos de una solicitud rechazada quedan como historial/soporte:
+      // no se cargan como editables, para que no se puedan borrar al corregir.
+      setHistoricalAttachments(attArr);
+      setAttachments([]);
+    } else {
+      setAttachments(attArr);
+      setHistoricalAttachments([]);
+    }
     const parts = (d.participantes as Participant[] | null) ?? [];
     setParticipants(Array.isArray(parts) ? parts : []);
     const tipoPersona = (d.tipo_persona as TipoPersona) || "Persona Natural";
@@ -506,9 +516,12 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
 
           {/* Adjuntos */}
           <Section title="Adjuntos">
-            {user && (
-              <AttachmentsField value={attachments} onChange={setAttachments} userId={user.id} disabled={busy} />
-            )}
+            <div className="space-y-4">
+              {isAdmin && <HistoricalAttachmentsList items={historicalAttachments} />}
+              {user && (
+                <AttachmentsField value={attachments} onChange={setAttachments} userId={user.id} disabled={busy} />
+              )}
+            </div>
           </Section>
         </>
       )}
