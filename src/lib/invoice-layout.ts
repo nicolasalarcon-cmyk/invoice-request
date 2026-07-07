@@ -169,7 +169,7 @@ export function fixMojibake(s: string): string {
 }
 
 export interface ResolverData {
-  recibo_numero: number | null;
+  recibo_numero: string | null;
   recibo_fecha: string;
   nombre: string;
   identificacion: string;
@@ -390,7 +390,7 @@ export const DEFAULT_LAYOUT: InvoiceLayout = (() => {
 
 export function sampleData(): ResolverData {
   return {
-    recibo_numero: 6027126,
+    recibo_numero: "6027126",
     recibo_fecha: "2026-05-26",
     nombre: "Diana Carolina Arango Gonzalez",
     identificacion: "32258517",

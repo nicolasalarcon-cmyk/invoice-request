@@ -87,7 +87,7 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
   const [form, setForm] = useState<FormState>(EMPTY);
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [originalStatus, setOriginalStatus] = useState<string | null>(null);
-  const [originalReciboNumero, setOriginalReciboNumero] = useState<number | null>(null);
+  const [originalReciboNumero, setOriginalReciboNumero] = useState<string | null>(null);
   const [programas, setProgramas] = useState<Programa[]>([]);
   const [openProg, setOpenProg] = useState(false);
   const [cohortes, setCohortes] = useState<CohorteRow[]>([]);
@@ -315,7 +315,7 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
           status: approveNow ? "aprobada" : "pendiente",
           approved_by: approveNow ? user.id : null,
           approved_at: approveNow ? new Date().toISOString() : null,
-          recibo_numero: approveNow ? Date.now() % 100000000 : null,
+          recibo_numero: approveNow ? String(Date.now() % 100000000) : null,
         });
         if (error) throw error;
         toast.success(approveNow ? "Recibo creado y aprobado" : "Solicitud enviada");

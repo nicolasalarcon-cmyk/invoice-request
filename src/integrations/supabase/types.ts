@@ -48,7 +48,7 @@ export type Database = {
           nombre: string
           programa: string | null
           recibo_fecha: string
-          recibo_numero: number
+          recibo_numero: string
           valor_total: number
         }
         Insert: {
@@ -63,7 +63,7 @@ export type Database = {
           nombre: string
           programa?: string | null
           recibo_fecha: string
-          recibo_numero: number
+          recibo_numero: string
           valor_total?: number
         }
         Update: {
@@ -78,7 +78,7 @@ export type Database = {
           nombre?: string
           programa?: string | null
           recibo_fecha?: string
-          recibo_numero?: number
+          recibo_numero?: string
           valor_total?: number
         }
         Relationships: []
@@ -131,7 +131,7 @@ export type Database = {
           programa: string
           recargo_total: number
           recibo_fecha: string
-          recibo_numero: number | null
+          recibo_numero: string | null
           rejection_reason: string | null
           source: string
           source_row_id: string | null
@@ -192,7 +192,7 @@ export type Database = {
           programa?: string
           recargo_total?: number
           recibo_fecha?: string
-          recibo_numero?: number | null
+          recibo_numero?: string | null
           rejection_reason?: string | null
           source?: string
           source_row_id?: string | null
@@ -253,7 +253,7 @@ export type Database = {
           programa?: string
           recargo_total?: number
           recibo_fecha?: string
-          recibo_numero?: number | null
+          recibo_numero?: string | null
           rejection_reason?: string | null
           source?: string
           source_row_id?: string | null

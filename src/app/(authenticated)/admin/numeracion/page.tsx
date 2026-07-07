@@ -24,7 +24,7 @@ interface Row {
   id: string;
   document_type: DocType;
   status: Status;
-  recibo_numero: number | null;
+  recibo_numero: string | null;
   recibo_fecha: string;
   created_at: string;
   nombre: string;

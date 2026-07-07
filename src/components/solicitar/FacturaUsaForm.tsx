@@ -78,7 +78,7 @@ export function FacturaUsaForm({ editId, duplicateFromId }: { editId?: string; d
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [originalStatus, setOriginalStatus] = useState<string | null>(null);
-  const [originalReciboNumero, setOriginalReciboNumero] = useState<number | null>(null);
+  const [originalReciboNumero, setOriginalReciboNumero] = useState<string | null>(null);
   const [programas, setProgramas] = useState<Programa[]>([]);
   const [openProg, setOpenProg] = useState(false);
   const [cohortes, setCohortes] = useState<CohorteRow[]>([]);

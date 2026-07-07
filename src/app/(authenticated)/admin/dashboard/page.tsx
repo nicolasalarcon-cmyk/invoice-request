@@ -18,7 +18,7 @@ interface Row {
   comercial_nombre: string | null;
   nombre: string;
   identificacion: string;
-  recibo_numero: number | null;
+  recibo_numero: string | null;
   programa: string;
   periodo: string;
   document_type: string | null;

@@ -81,7 +81,7 @@ interface Req {
   recargo_total: number;
   fecha_limite_pago: string | null;
   fecha_pago_extraordinario: string | null;
-  recibo_numero: number | null;
+  recibo_numero: string | null;
   recibo_fecha: string;
   approved_at: string | null;
   created_at: string;
@@ -111,7 +111,7 @@ async function sendInvoiceEmail(data: {
   kind?: "approved" | "rejected";
   comercial_email: string;
   nombre: string;
-  recibo_numero: number | null;
+  recibo_numero: string | null;
   pdfBase64?: string;
   rejection_reason?: string;
 }) {
@@ -273,7 +273,7 @@ export default function AdminPanel() {
         });
         pdfBase64 = dataUrl.split(",")[1];
       }
-      const reciboNumero = Number(manualReciboNumero);
+      const reciboNumero = manualReciboNumero.trim();
       const user = (await supabase.auth.getUser()).data.user;
       const { error } = await supabase
         .from("invoice_requests")
@@ -312,7 +312,7 @@ export default function AdminPanel() {
     if (!(await assertNotStale(r))) return;
     const tpl = templates.find((t) => t.id === selectedTemplate);
     const user = (await supabase.auth.getUser()).data.user;
-    const reciboNumero = r.recibo_numero ?? Date.now() % 100000000;
+    const reciboNumero = r.recibo_numero ?? String(Date.now() % 100000000);
     const today = new Date();
     const limite = r.fecha_limite_pago ?? new Date(today.getTime() + (tpl?.dias_limite ?? 4) * 86400000).toISOString().slice(0, 10);
     const extra = new Date(new Date(limite).getTime() + (tpl?.dias_extraordinario ?? 7) * 86400000).toISOString().slice(0, 10);
@@ -664,13 +664,17 @@ export default function AdminPanel() {
               <div className="space-y-1">
                 <label className="text-sm font-medium">N° Consecutivo *</label>
                 <Input
-                  type="number"
-                  min={1}
-                  placeholder="Ej: 1042"
+                  type={approving?.document_type === "factura_colombia" ? "text" : "number"}
+                  min={approving?.document_type === "factura_colombia" ? undefined : 1}
+                  placeholder={approving?.document_type === "factura_colombia" ? "Ej: FC-1042" : "Ej: 1042"}
                   value={manualReciboNumero}
                   onChange={(e) => setManualReciboNumero(e.target.value)}
                 />
-                <p className="text-xs text-muted-foreground">Quedará registrado en la sección Numeración.</p>
+                <p className="text-xs text-muted-foreground">
+                  {approving?.document_type === "factura_colombia"
+                    ? "Puede incluir letras y números. Quedará registrado en la sección Numeración."
+                    : "Quedará registrado en la sección Numeración."}
+                </p>
               </div>
               <div className="space-y-1">
                 <label className="text-sm font-medium">Sube aquí tu factura *</label>

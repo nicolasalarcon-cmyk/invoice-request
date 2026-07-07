@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
     kind?: "approved" | "rejected";
     comercial_email: string;
     nombre: string;
-    recibo_numero: number | null;
+    recibo_numero: string | null;
     pdfBase64?: string;
     rejection_reason?: string;
   };

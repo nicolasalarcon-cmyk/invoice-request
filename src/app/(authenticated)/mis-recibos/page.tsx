@@ -45,7 +45,7 @@ interface Req {
   recargo_total: number;
   fecha_limite_pago: string | null;
   fecha_pago_extraordinario: string | null;
-  recibo_numero: number | null;
+  recibo_numero: string | null;
   recibo_fecha: string;
   created_at: string;
   rejection_reason: string | null;

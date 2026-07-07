@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { ArrowLeft, Save, RefreshCw } from "lucide-react";
 
 const USA_SAMPLE = {
-  recibo_numero: 2026001,
+  recibo_numero: "2026001",
   recibo_fecha: "2026-06-18",
   nombre: "John Smith",
   identificacion: "PA 987654321",
