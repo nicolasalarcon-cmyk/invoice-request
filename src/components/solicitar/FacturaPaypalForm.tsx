@@ -1,5 +1,5 @@
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -165,11 +165,7 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
     setForm((f) => ({ ...f, cohorte: c.codigo, fecha_inicio: c.fecha_inicio }));
   };
 
-  const { valorNum, valorTotalEmpresa } = useMemo(() => {
-    const v = Number(form.valor) || 0;
-    const n = Math.max(Number(form.numero_participantes) || 1, 1);
-    return { valorNum: v, valorTotalEmpresa: v * n };
-  }, [form.valor, form.numero_participantes]);
+  const valorNum = Number(form.valor) || 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -209,7 +205,7 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
         matricula: valorNum,
         descuento: 0, descuento_pct: 0, descuento_bono: 0,
         valor_total: valorNum,
-        valor_total_empresa: isJuridica ? valorTotalEmpresa : null,
+        valor_total_empresa: null,
         recargo_total: valorNum,
         fecha_limite_pago: form.fecha_limite_pago,
         observaciones: null,
@@ -283,7 +279,6 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
   };
 
   const isJuridica = form.tipo_persona === "Persona Jurídica";
-  const numParticipantes = Math.max(Number(form.numero_participantes) || 1, 1);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -341,7 +336,7 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
               <Field label="Nombre de la Empresa *">
                 <Input required maxLength={200} value={form.empresa} onChange={(e) => update("empresa", e.target.value)} />
               </Field>
-              <Field label="NIT">
+              <Field label="Número de Identificación">
                 <Input maxLength={50} value={form.nit} onChange={(e) => update("nit", e.target.value)} />
               </Field>
               <Field label="Correo electrónico">
@@ -381,12 +376,6 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
                 </Field>
                 <Field label="Número de Identificación *">
                   <Input required maxLength={50} value={p.cedula} onChange={(e) => updateParticipant(i, "cedula", e.target.value)} />
-                </Field>
-                <Field label="Correo electrónico">
-                  <Input type="email" maxLength={200} value={p.email} onChange={(e) => updateParticipant(i, "email", e.target.value)} />
-                </Field>
-                <Field label="Teléfono">
-                  <Input maxLength={50} value={p.telefono} onChange={(e) => updateParticipant(i, "telefono", e.target.value)} />
                 </Field>
               </div>
             </Section>
@@ -470,23 +459,11 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
                 <Input required type="number" min={0} value={form.valor} onChange={(e) => update("valor", e.target.value)} />
               </Field>
 
-              {isJuridica ? (
-                <>
-                  <Field label="Valor Total a Pagar por Participante">
-                    <div className="flex h-9 items-center rounded-md border border-input bg-muted px-3 text-sm font-medium text-foreground">
-                      ${valorNum.toLocaleString("es-CO", { minimumFractionDigits: 0 })}
-                    </div>
-                  </Field>
-                  <Field label="Valor Total a Pagar por la Empresa">
-                    <div className="flex h-9 items-center rounded-md border border-input bg-muted px-3 text-sm font-medium text-foreground">
-                      ${valorTotalEmpresa.toLocaleString("es-CO", { minimumFractionDigits: 0 })}
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      ${valorNum.toLocaleString("es-CO", { minimumFractionDigits: 0 })} × {numParticipantes} participante(s)
-                    </p>
-                  </Field>
-                </>
-              ) : null}
+              <Field label="Valor Total a Pagar">
+                <div className="flex h-9 items-center rounded-md border border-input bg-muted px-3 text-sm font-medium text-foreground">
+                  ${valorNum.toLocaleString("es-CO", { minimumFractionDigits: 0 })}
+                </div>
+              </Field>
 
               <Field label="Fecha Límite de Pago *">
                 <Input required type="date" value={form.fecha_limite_pago} onChange={(e) => update("fecha_limite_pago", e.target.value)} />

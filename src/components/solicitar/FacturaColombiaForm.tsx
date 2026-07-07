@@ -175,14 +175,13 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
     setForm((f) => ({ ...f, cohorte: c.codigo, fecha_inicio: c.fecha_inicio }));
   };
 
-  const { valorNum, descuentoPct, descuentoFlat, computedTotal, computedTotalEmpresa } = useMemo(() => {
+  const { valorNum, descuentoPct, descuentoFlat, computedTotal } = useMemo(() => {
     const v = Number(form.valor) || 0;
     const pct = Math.min(Math.max(Number(form.descuento_pct) || 0, 0), 100);
     const flat = Math.round(v * pct / 100);
     const total = Math.max(v - flat, 0);
-    const n = Math.max(Number(form.numero_participantes) || 1, 1);
-    return { valorNum: v, descuentoPct: pct, descuentoFlat: flat, computedTotal: total, computedTotalEmpresa: total * n };
-  }, [form.valor, form.descuento_pct, form.numero_participantes]);
+    return { valorNum: v, descuentoPct: pct, descuentoFlat: flat, computedTotal: total };
+  }, [form.valor, form.descuento_pct]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -224,7 +223,7 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
         descuento_pct: descuentoPct,
         descuento_bono: descuentoFlat,
         valor_total: computedTotal,
-        valor_total_empresa: isJuridica ? computedTotalEmpresa : null,
+        valor_total_empresa: null,
         recargo_total: computedTotal,
         fecha_limite_pago: form.fecha_limite_pago,
         observaciones: form.observaciones || null,
@@ -298,7 +297,6 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
   };
 
   const isJuridica = form.tipo_persona === "Persona Jurídica";
-  const numParticipantes = Math.max(Number(form.numero_participantes) || 1, 1);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -356,7 +354,7 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
               <Field label="Nombre de la Empresa *">
                 <Input required maxLength={200} value={form.empresa} onChange={(e) => update("empresa", e.target.value)} />
               </Field>
-              <Field label="NIT">
+              <Field label="Número de Identificación">
                 <Input maxLength={50} value={form.nit} onChange={(e) => update("nit", e.target.value)} />
               </Field>
               <Field label="Correo electrónico">
@@ -396,12 +394,6 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
                 </Field>
                 <Field label="Número de Identificación *">
                   <Input required maxLength={50} value={p.cedula} onChange={(e) => updateParticipant(i, "cedula", e.target.value)} />
-                </Field>
-                <Field label="Correo electrónico">
-                  <Input type="email" maxLength={200} value={p.email} onChange={(e) => updateParticipant(i, "email", e.target.value)} />
-                </Field>
-                <Field label="Teléfono">
-                  <Input maxLength={50} value={p.telefono} onChange={(e) => updateParticipant(i, "telefono", e.target.value)} />
                 </Field>
               </div>
             </Section>
@@ -496,39 +488,16 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
                 <Input type="number" min={0} max={100} step="0.01" value={form.descuento_pct} onChange={(e) => update("descuento_pct", e.target.value)} />
               </Field>
 
-              {isJuridica ? (
-                <>
-                  <Field label="Valor Total a Pagar por Participante">
-                    <div className="flex h-9 items-center rounded-md border border-input bg-muted px-3 text-sm font-medium text-foreground">
-                      {formatCOP(computedTotal)}
-                    </div>
-                    {descuentoFlat > 0 && (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {formatCOP(valorNum)} − {formatCOP(descuentoFlat)} ({descuentoPct}%)
-                      </p>
-                    )}
-                  </Field>
-                  <Field label="Valor Total a Pagar por la Empresa">
-                    <div className="flex h-9 items-center rounded-md border border-input bg-muted px-3 text-sm font-medium text-foreground">
-                      {formatCOP(computedTotalEmpresa)}
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {formatCOP(computedTotal)} × {numParticipantes} participante(s)
-                    </p>
-                  </Field>
-                </>
-              ) : (
-                <Field label="Valor Total a Pagar">
-                  <div className="flex h-9 items-center rounded-md border border-input bg-muted px-3 text-sm font-medium text-foreground">
-                    {formatCOP(computedTotal)}
-                  </div>
-                  {descuentoFlat > 0 && (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {formatCOP(valorNum)} − {formatCOP(descuentoFlat)} ({descuentoPct}%)
-                    </p>
-                  )}
-                </Field>
-              )}
+              <Field label="Valor Total a Pagar">
+                <div className="flex h-9 items-center rounded-md border border-input bg-muted px-3 text-sm font-medium text-foreground">
+                  {formatCOP(computedTotal)}
+                </div>
+                {descuentoFlat > 0 && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {formatCOP(valorNum)} − {formatCOP(descuentoFlat)} ({descuentoPct}%)
+                  </p>
+                )}
+              </Field>
 
               <Field label="Fecha de Vencimiento de la Factura *">
                 <Input required type="date" value={form.fecha_limite_pago} onChange={(e) => update("fecha_limite_pago", e.target.value)} />

@@ -790,7 +790,7 @@ export default function AdminPanel() {
                     {isPersonaFlow && isJuridica ? (
                       <>
                         <PreviewRow label="Empresa" value={previewing.empresa ?? previewing.nombre} />
-                        <PreviewRow label="NIT" value={previewing.nit ?? previewing.identificacion} />
+                        <PreviewRow label="Número de Identificación" value={previewing.nit ?? previewing.identificacion} />
                         <PreviewRow label="País" value={previewing.pais ?? "—"} />
                         <PreviewRow label="Ciudad" value={previewing.ciudad ?? "—"} />
                         <div className="sm:col-span-2"><PreviewRow label="Dirección" value={previewing.direccion ?? "—"} /></div>

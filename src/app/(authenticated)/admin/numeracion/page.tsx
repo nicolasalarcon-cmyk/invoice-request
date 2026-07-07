@@ -229,7 +229,7 @@ export default function Numeracion() {
       "Email":                r.email ?? "",
       "Teléfono":             r.telefono ?? "",
       "Empresa":              r.empresa ?? "",
-      "NIT":                  r.nit ?? "",
+      "Número de Identificación": r.nit ?? "",
       "Tipo persona":         r.tipo_persona ?? "",
       "Programa":             r.programa ?? "",
       "Concepto":             r.concepto ?? "",
@@ -390,7 +390,7 @@ export default function Numeracion() {
                             <Detail label="Email"               value={r.email} />
                             <Detail label="Teléfono"            value={r.telefono} />
                             <Detail label="Empresa"             value={r.empresa} />
-                            <Detail label="NIT"                 value={r.nit} />
+                            <Detail label="Número de Identificación" value={r.nit} />
                             <Detail label="País"                value={r.pais} />
                             <Detail label="Ciudad"              value={r.ciudad} />
                             <Detail label="Dirección"           value={r.direccion} />

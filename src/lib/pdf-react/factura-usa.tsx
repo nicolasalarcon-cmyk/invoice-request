@@ -161,12 +161,11 @@ export function FacturaUSADocument({
   data: InvoiceData;
   _tpl: InvoiceTemplate;
 }) {
-  const n = Math.max(Number(data.numero_participantes) || 1, 1);
   const subtotalUnit = Number(data.matricula) || 0;
   const descuentoUnit = Number(data.descuento_bono) || Number(data.descuento) || 0;
-  const subtotal = subtotalUnit * n;
-  const descuento = descuentoUnit * n;
-  const total = Number(data.valor_total_empresa) || Number(data.valor_total) || Math.max(subtotal - descuento, 0);
+  const subtotal = subtotalUnit;
+  const descuento = descuentoUnit;
+  const total = Number(data.valor_total) || Math.max(subtotal - descuento, 0);
 
   const mainDesc =
     [data.nemonico, data.programa].filter(Boolean).join(" ").trim() ||
@@ -253,7 +252,7 @@ export function FacturaUSADocument({
 
         <View style={s.tableRow}>
           <View style={s.colQty}>
-            <Text style={{ fontSize: 9, color: "#28292C" }}>{n}</Text>
+            <Text style={{ fontSize: 9, color: "#28292C" }}>1</Text>
           </View>
           <View style={s.colDesc}>
             <Text style={s.descMain}>{mainDesc}</Text>
