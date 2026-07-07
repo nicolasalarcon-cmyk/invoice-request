@@ -198,7 +198,7 @@ export default function Numeracion() {
     participantes: r.participantes,
     recargo_total: Number(r.recargo_total ?? 0), fecha_limite_pago: r.fecha_limite_pago,
     fecha_pago_extraordinario: r.fecha_pago_extraordinario, template_id: r.template_id,
-    tipo_programa: r.tipo_programa, document_type: r.document_type,
+    tipo_programa: r.tipo_programa, document_type: r.document_type, tipo_persona: r.tipo_persona,
     empresa: r.empresa, cliente_nit: r.nit, direccion: r.direccion,
     ciudad: r.ciudad, telefono: r.telefono, pais: r.pais,
     email: r.email, nemonico: r.nemonico, observaciones: r.observaciones,

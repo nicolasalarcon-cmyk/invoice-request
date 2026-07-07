@@ -16,6 +16,7 @@ export interface InvoiceData extends ResolverData {
   template_id?: string | null;
   tipo_programa?: string | null;
   document_type?: string | null;
+  tipo_persona?: string | null;
   valor_total?: number | null;
   valor_total_empresa?: number | null;
   numero_participantes?: number | null;

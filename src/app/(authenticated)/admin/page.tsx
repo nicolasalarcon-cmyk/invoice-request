@@ -436,7 +436,7 @@ export default function AdminPanel() {
       participantes: r.participantes,
       recargo_total: Number(r.recargo_total), fecha_limite_pago: r.fecha_limite_pago,
       fecha_pago_extraordinario: r.fecha_pago_extraordinario, template_id: r.template_id,
-      tipo_programa: r.tipo_programa, document_type: r.document_type,
+      tipo_programa: r.tipo_programa, document_type: r.document_type, tipo_persona: r.tipo_persona,
       empresa: x.empresa ?? null, cliente_nit: x.nit ?? null, direccion: x.direccion ?? null,
       ciudad: x.ciudad ?? null, telefono: x.telefono ?? null, pais: x.pais ?? null,
       email: r.email, nemonico: x.nemonico ?? null, observaciones: r.observaciones,

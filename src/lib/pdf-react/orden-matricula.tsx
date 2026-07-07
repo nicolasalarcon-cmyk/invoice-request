@@ -57,6 +57,7 @@ export interface OrdenData {
   recargo_total: number;
   fecha_limite: string;
   fecha_extraordinario: string;
+  esPagoPersonal: boolean;
 }
 
 export function resolveOrdenData(data: InvoiceData, tpl: InvoiceTemplate): OrdenData {
@@ -109,6 +110,7 @@ export function resolveOrdenData(data: InvoiceData, tpl: InvoiceTemplate): Orden
     fecha_extraordinario: data.fecha_pago_extraordinario
       ? formatDate(data.fecha_pago_extraordinario)
       : "—",
+    esPagoPersonal: (data.tipo_persona ?? "").trim().toLowerCase() === "personal",
   };
 }
 
@@ -410,8 +412,8 @@ function InvoiceCopy({ d, label }: { d: OrdenData; label: "ALUMNO" | "UNIVERSIDA
             <Text style={s.nitLine}>Vigilada por el Ministerio de Educación Nacional</Text>
             <Text style={s.nitLine}>Resolución Número 21329</Text>
             <Text style={s.nitLine}>Código de Institución SNIES 9923</Text>
-            <Text style={s.nitLine}>Teléfono: 305 9140563</Text>
-            <Text style={s.nitLine}>Correo: info@altatec.org</Text>
+            <Text style={s.nitLine}>Teléfono: 316 2887603</Text>
+            <Text style={s.nitLine}>Correo: tesoreria@udecatalunya.org</Text>
           </View>
 
           {/* Right: description + recibo box */}
@@ -545,6 +547,11 @@ function InvoiceCopy({ d, label }: { d: OrdenData; label: "ALUMNO" | "UNIVERSIDA
         <View style={s.footer}>
           {d.medios_pago ? (
             <Text style={[s.footerLine, { fontWeight: "bold" }]}>{d.medios_pago}</Text>
+          ) : null}
+          {d.esPagoPersonal ? (
+            <Text style={[s.footerLine, { fontWeight: "bold" }]}>
+              También puede pagar en línea con Wompi: https://checkout.wompi.co/l/7l5Lun
+            </Text>
           ) : null}
           {d.nota_retencion ? (
             <Text style={s.footerLine}>{d.nota_retencion}</Text>
