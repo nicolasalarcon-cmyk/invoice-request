@@ -79,7 +79,7 @@ const EMPTY: CoForm = {
 };
 
 export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: string; duplicateFromId?: string }) {
-  const { user, role, canApprove, canViewAllRequests, isComercial, profile } = useAuth();
+  const { user, role, canApprove, canViewAllRequests, isComercial, profile, loading: authLoading } = useAuth();
   const isAdmin = canApprove;
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -333,7 +333,7 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
     <form onSubmit={handleSubmit} className="space-y-6">
 
       {/* ── COMERCIAL ── */}
-      <Section title={SECTION_TITLE_BY_ROLE[role ?? ""] ?? "Datos del Líder Comercial"}>
+      <Section title={authLoading ? "" : (SECTION_TITLE_BY_ROLE[role ?? ""] ?? "Datos del Líder Comercial")}>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Nombre Completo">
             <Input value={profile?.nombre_completo ?? ""} disabled />
