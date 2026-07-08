@@ -49,14 +49,11 @@ export default function AsesoresPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-8">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Asesores comerciales</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Estos nombres aparecen en el selector "Asesor Comercial" al crear una solicitud.
-          Los jefes de área deben quedar incluidos aquí también, para poder asignarse a sí mismos
-          cuando la solicitud no corresponde a un asesor en particular.
-        </p>
-      </div>
+      <p className="text-sm text-muted-foreground">
+        Estos nombres aparecen en el selector "Asesor Comercial" al crear una solicitud.
+        Los jefes de área deben quedar incluidos aquí también, para poder asignarse a sí mismos
+        cuando la solicitud no corresponde a un asesor en particular.
+      </p>
 
       <div className="mt-6 flex gap-2">
         <Input

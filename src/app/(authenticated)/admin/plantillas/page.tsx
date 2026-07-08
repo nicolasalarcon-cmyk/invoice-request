@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { clearTemplateCache, getTemplateDocType, type InvoiceTemplate } from "@/lib/invoice-template";
-import { Plus, Copy, Trash2, Star, LayoutTemplate, Pencil } from "lucide-react";
+import { Plus, Copy, Trash2, Star, Pencil } from "lucide-react";
 
 export default function PlantillasPage() {
   const { canManageTemplates: isAdmin, loading, user } = useAuth();
@@ -76,15 +76,10 @@ export default function PlantillasPage() {
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-8">
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <LayoutTemplate className="h-6 w-6" /> Plantillas de factura
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Haz clic en <strong>Editar</strong> para ajustar los textos y ver la vista previa en tiempo real.
-          </p>
-        </div>
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          Haz clic en <strong>Editar</strong> para ajustar los textos y ver la vista previa en tiempo real.
+        </p>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => newTemplate("factura_usa")}>
             <Plus className="mr-2 h-4 w-4" /> Nueva · Factura USA

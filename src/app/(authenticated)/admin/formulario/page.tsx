@@ -48,11 +48,7 @@ export default function FormularioPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-8">
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Editor de formulario</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Controla qué campos ven los comerciales y las listas de selección.</p>
-        </div>
+      <div className="flex items-center justify-end">
         <Button onClick={save} disabled={busy}><Save className="mr-2 h-4 w-4" /> {busy ? "Guardando…" : "Guardar"}</Button>
       </div>
 

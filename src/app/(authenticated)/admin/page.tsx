@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -16,12 +15,15 @@ import { toast } from "sonner";
 import { formatCOP, formatDate } from "@/lib/format";
 import {
   AlertTriangle, CheckCircle2, XCircle, FileDown, Inbox, Search, Pencil,
-  FileText, Trash2, Eye, Copy, BookOpen, Wrench,
+  FileText, Trash2, Eye, Copy, Wrench, ArrowLeft,
+  User, GraduationCap, DollarSign, Paperclip, ChevronRight,
+  Receipt, Globe, Landmark, Wallet, Calendar, X,
 } from "lucide-react";
 import { listTemplates, getTemplateDocType, type InvoiceTemplate } from "@/lib/invoice-template";
 import { useLiveRefresh } from "@/lib/use-live-refresh";
 import { deleteInvoiceFiles } from "@/lib/delete-invoice-files";
 import { cn } from "@/lib/utils";
+import { DetailSection, PreviewRow } from "@/components/solicitudes/detail-panel";
 
 type Status = "pendiente" | "aprobada" | "rechazada" | "corregida";
 
@@ -115,6 +117,13 @@ const DOC_TYPE_LABELS: Record<string, string> = {
   factura_paypal: "Factura PayPal",
 };
 
+const STATUS_PILL: Record<Status, string> = {
+  pendiente: "bg-amber-50 text-amber-700",
+  aprobada: "bg-emerald-50 text-emerald-700",
+  rechazada: "bg-rose-50 text-rose-700",
+  corregida: "bg-blue-50 text-blue-700",
+};
+
 async function sendInvoiceEmail(data: {
   kind?: "approved" | "rejected";
   comercial_email: string;
@@ -141,7 +150,7 @@ export default function AdminPanel() {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | Status>("all");
-  const [tipoFilter, setTipoFilter] = useState<string>("all");
+  const [tipoFilter, setTipoFilter] = useState<"all" | DocType>("all");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [approving, setApproving] = useState<Req | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
@@ -151,6 +160,7 @@ export default function AdminPanel() {
   const [rejectCategory, setRejectCategory] = useState("");
   const [rejectOtherText, setRejectOtherText] = useState("");
   const [previewing, setPreviewing] = useState<Req | null>(null);
+  const [detailTab, setDetailTab] = useState<"general" | "academico" | "pago" | "adjuntos">("general");
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [pdfPreviewName, setPdfPreviewName] = useState("");
   const [pdfPreviewLoading, setPdfPreviewLoading] = useState(false);
@@ -171,13 +181,6 @@ export default function AdminPanel() {
   useEffect(() => { if (canViewAllRequests) load(); }, [canViewAllRequests]);
 
   useLiveRefresh("invoice_requests_inbox", () => load(true), canViewAllRequests);
-
-  const tipos: { value: string; label: string }[] = [
-    { value: "orden_matricula", label: "Orden de Matrícula" },
-    { value: "factura_usa",     label: "Factura USA" },
-    { value: "factura_colombia", label: "Factura Colombia" },
-    { value: "factura_paypal",  label: "Factura Paypal" },
-  ];
 
   const cedAlerts = useMemo(() => {
     const byCed = new Map<string, Req[]>();
@@ -211,26 +214,58 @@ export default function AdminPanel() {
     && r.created_by_role !== "super_admin"
     && r.created_by_role !== "financiera";
 
-  const filtered = useMemo(() => {
+  // Base visible para el rol actual, antes de aplicar el filtro de estado —
+  // sirve tanto para la lista final como para los contadores de cada chip.
+  const visibleForRole = useMemo(() => {
     const s = q.toLowerCase().trim();
-    const fromTs = dateFrom ? new Date(dateFrom).getTime() : 0;
     return items.filter((r) => {
       // "Eliminar" de Financiera/Cartera solo oculta de su propia vista,
       // no afecta lo que ve Admin/SuperAdmin.
       if (r.archived_by_reviewer && (role === "financiera" || role === "cartera")) return false;
-      if (statusFilter !== "all" && r.status !== statusFilter) return false;
-      if (tipoFilter !== "all" && r.document_type !== tipoFilter) return false;
-      if (fromTs && new Date(r.created_at).getTime() < fromTs) return false;
       if (!s) return true;
       return (
         r.nombre.toLowerCase().includes(s) ||
         r.identificacion.includes(s) ||
         String(r.recibo_numero ?? "").includes(s) ||
         (r.comercial_nombre ?? "").toLowerCase().includes(s) ||
-        (r.comercial_email ?? "").toLowerCase().includes(s)
+        (r.comercial_email ?? "").toLowerCase().includes(s) ||
+        (r.asesor_nombre ?? "").toLowerCase().includes(s) ||
+        (r.programa ?? "").toLowerCase().includes(s) ||
+        (r.tipo_programa ?? "").toLowerCase().includes(s) ||
+        (r.concepto ?? "").toLowerCase().includes(s) ||
+        (DOC_TYPE_LABELS[r.document_type ?? ""] ?? "").toLowerCase().includes(s)
       );
     });
-  }, [items, q, statusFilter, tipoFilter, dateFrom, role]);
+  }, [items, q, role]);
+
+  const statusCounts = useMemo(() => ({
+    all: visibleForRole.length,
+    pendiente: visibleForRole.filter((r) => r.status === "pendiente").length,
+    aprobada: visibleForRole.filter((r) => r.status === "aprobada").length,
+    corregida: visibleForRole.filter((r) => r.status === "corregida").length,
+    rechazada: visibleForRole.filter((r) => r.status === "rechazada").length,
+  }), [visibleForRole]);
+
+  // Cuántas solicitudes pendientes hay de cada tipo de documento — para el
+  // filtro por tipo, así se ve de un vistazo dónde hay trabajo por hacer.
+  const tipoPendingCounts = useMemo(() => {
+    const counts: Partial<Record<DocType, number>> = {};
+    visibleForRole.forEach((r) => {
+      if (r.status !== "pendiente" || !r.document_type) return;
+      counts[r.document_type] = (counts[r.document_type] ?? 0) + 1;
+    });
+    return counts;
+  }, [visibleForRole]);
+
+  const filtered = useMemo(() => {
+    const fromTs = dateFrom ? new Date(dateFrom).getTime() : 0;
+    return visibleForRole.filter((r) => {
+      if (statusFilter !== "all" && r.status !== statusFilter) return false;
+      if (tipoFilter !== "all" && r.document_type !== tipoFilter) return false;
+      if (fromTs && new Date(r.created_at).getTime() < fromTs) return false;
+      return true;
+    });
+  }, [visibleForRole, statusFilter, tipoFilter, dateFrom]);
 
   if (authLoading) return <p className="p-6 text-sm text-muted-foreground">Cargando…</p>;
   if (!canViewAllRequests) {
@@ -257,6 +292,27 @@ export default function AdminPanel() {
       (r.template_id && docTemplates.some((t) => t.id === r.template_id) ? r.template_id : null)
       ?? matchTipo?.id ?? matchAny?.id ?? docTemplates[0]?.id ?? "",
     );
+  };
+
+  const openRejectDialog = (r: Req) => {
+    setRejecting(r);
+    const existing = r.rejection_reason ?? "";
+    const match = REJECT_OPTIONS.find(o => existing.startsWith(o.category));
+    if (match) {
+      setRejectCategory(match.category);
+      if (match.category === "Otra razón") {
+        setRejectOtherText(existing.replace("Otra razón — ", ""));
+      } else {
+        const prefix = `${match.category} — ${match.description ?? ""}`;
+        const rest = existing.startsWith(prefix) ? existing.slice(prefix.length) : "";
+        setRejectOtherText(rest.startsWith(" · ") ? rest.slice(3) : "");
+      }
+    } else if (existing) {
+      setRejectCategory("Otra razón");
+      setRejectOtherText(existing);
+    } else {
+      setRejectCategory(""); setRejectOtherText("");
+    }
   };
 
   const assertNotStale = async (r: Req) => {
@@ -338,6 +394,7 @@ export default function AdminPanel() {
       setApproving(null);
       setApprovalPdf(null);
       setManualReciboNumero("");
+      setPreviewing((p) => p?.id === r.id ? null : p);
       load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo aprobar");
@@ -392,6 +449,7 @@ export default function AdminPanel() {
     }
 
     setApproving(null);
+    setPreviewing((p) => p?.id === r.id ? null : p);
     load();
   };
 
@@ -426,6 +484,7 @@ export default function AdminPanel() {
     setRejecting(null);
     setRejectCategory("");
     setRejectOtherText("");
+    setPreviewing((p) => p?.id === rejecting.id ? null : p);
     load();
   };
 
@@ -435,6 +494,7 @@ export default function AdminPanel() {
     const { error } = await supabase.from("invoice_requests").delete().eq("id", r.id);
     if (error) return toast.error(error.message);
     toast.success("Factura eliminada");
+    setPreviewing((p) => p?.id === r.id ? null : p);
     load();
   };
 
@@ -453,6 +513,7 @@ export default function AdminPanel() {
       return;
     }
     setItems((prev) => prev.map((x) => x.id === r.id ? { ...x, archived_by_reviewer: true } : x));
+    setPreviewing((p) => p?.id === r.id ? null : p);
     toast.success("Solicitud ocultada de tu bandeja");
   };
 
@@ -529,53 +590,116 @@ export default function AdminPanel() {
   };
 
   return (
-    <main className="mx-auto max-w-7xl px-6 py-8">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Bandeja de solicitudes</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Todas las solicitudes en un solo lugar.</p>
-        </div>
+    <main className="mx-auto max-w-7xl px-6 py-4">
+      {!previewing && (
+      <>
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
         <div className="flex items-center gap-2">
-          <Link href="/admin/programas"><Button variant="outline" size="sm"><BookOpen className="mr-2 h-4 w-4" /> Programas</Button></Link>
-          <Link href="/admin/numeracion"><Button variant="outline" size="sm"><FileText className="mr-2 h-4 w-4" /> Numeración</Button></Link>
-          <Button variant="outline" size="sm" onClick={() => load()}>Actualizar</Button>
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="rounded-xl bg-muted/40 pl-9"
+              placeholder="Buscar por estudiante, ID, recibo, asesor, comercial, programa…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </div>
+          <div className={cn(
+            "flex shrink-0 items-center gap-1.5 rounded-xl border px-2.5 h-10 transition-all",
+            dateFrom ? "border-primary bg-primary/5" : "border-transparent bg-muted/40",
+          )}>
+            <Calendar className={cn("h-4 w-4", dateFrom ? "text-primary" : "text-muted-foreground")} />
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className={cn(
+                "w-[9.5rem] bg-transparent text-sm outline-none",
+                dateFrom ? "text-foreground font-medium" : "text-muted-foreground",
+              )}
+            />
+            {dateFrom && (
+              <button
+                type="button"
+                onClick={() => setDateFrom("")}
+                className="text-muted-foreground hover:text-foreground"
+                title="Quitar filtro de fecha"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {([
+            { id: "all" as const, label: "Todas", icon: "📋" },
+            { id: "pendiente" as const, label: "Pendientes", icon: "🟡" },
+            { id: "aprobada" as const, label: "Aprobadas", icon: "🟢" },
+            { id: "corregida" as const, label: "Corregidas", icon: "🔵" },
+            { id: "rechazada" as const, label: "Rechazadas", icon: "🔴" },
+          ]).map((c) => {
+            const active = statusFilter === c.id;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setStatusFilter(c.id)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition-all",
+                  active ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted/50 text-muted-foreground hover:bg-muted",
+                )}
+              >
+                <span>{c.icon}</span> {c.label}
+                <span className={cn(
+                  "rounded-full px-1.5 py-0.5 text-xs font-bold",
+                  active ? "bg-white/20" : "bg-background",
+                )}>
+                  {statusCounts[c.id]}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {([
+            { id: "orden_matricula" as const, label: "Orden de Matrícula", icon: Receipt },
+            { id: "factura_usa" as const, label: "Factura USA", icon: Globe },
+            { id: "factura_colombia" as const, label: "Factura Colombia", icon: Landmark },
+            { id: "factura_paypal" as const, label: "Factura PayPal", icon: Wallet },
+          ]).map((t) => {
+            const active = tipoFilter === t.id;
+            const Icon = t.icon;
+            const pendientes = tipoPendingCounts[t.id] ?? 0;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTipoFilter(active ? "all" : t.id)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all",
+                  active ? "border-primary bg-primary text-primary-foreground shadow-sm" : "border-border bg-card text-muted-foreground hover:bg-muted/50",
+                )}
+              >
+                <Icon className="h-3.5 w-3.5" /> {t.label}
+                {pendientes > 0 && (
+                  <span className={cn(
+                    "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+                    active ? "bg-white/20" : "bg-amber-100 text-amber-700",
+                  )}>
+                    {pendientes}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <div className="mt-6 flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-64">
-          <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input className="pl-8" placeholder="Buscar por estudiante, recibo o asesor…" value={q} onChange={(e) => setQ(e.target.value)} />
-        </div>
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
-          <SelectTrigger className="w-44"><SelectValue placeholder="Estado" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los estados</SelectItem>
-            <SelectItem value="pendiente">Pendiente</SelectItem>
-            <SelectItem value="aprobada">Aprobada</SelectItem>
-            <SelectItem value="corregida">Corregida</SelectItem>
-            <SelectItem value="rechazada">Rechazada</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={tipoFilter} onValueChange={setTipoFilter}>
-          <SelectTrigger className="w-44"><SelectValue placeholder="Tipo" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los tipos</SelectItem>
-            {tipos.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <div className="flex items-center gap-1">
-          <span className="text-xs text-muted-foreground">Desde</span>
-          <Input type="date" className="w-40" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-          {dateFrom && <Button variant="ghost" size="sm" onClick={() => setDateFrom("")}>×</Button>}
-        </div>
-      </div>
-
-      <div className="mt-6">
+      <div className="mt-3">
         {loading ? (
           <p className="text-sm text-muted-foreground">Cargando…</p>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-16">
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-16">
             <Inbox className="h-8 w-8 text-muted-foreground" />
             <p className="mt-3 text-sm text-muted-foreground">Sin resultados.</p>
           </div>
@@ -584,138 +708,81 @@ export default function AdminPanel() {
             {filtered.map((r) => {
               const alertN = cedAlerts.get(r.identificacion);
               return (
-                <div key={r.id} className="rounded-lg border border-border bg-card p-5">
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div className="min-w-0 flex-1">
+                <div
+                  key={r.id}
+                  onClick={() => { setPreviewing(r); setDetailTab("general"); }}
+                  className="group relative flex cursor-pointer flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm transition-all duration-200 hover:bg-muted/40 hover:shadow-md md:flex-row md:items-center md:justify-between"
+                >
+                  {/* Caja de información e identidad */}
+                  <div className="flex min-w-0 flex-1 items-start gap-3.5">
+                    <div className="min-w-0 space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <button type="button" onClick={() => setPreviewing(r)} className="truncate font-semibold text-foreground hover:underline text-left">
-                          {r.nombre}
-                        </button>
-                        <StatusBadge s={r.status} />
-                        {r.recibo_numero && <span className="text-xs font-mono text-muted-foreground">#{r.recibo_numero}</span>}
+                        <span className="block truncate text-lg font-bold text-foreground">{r.nombre}</span>
+                        <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider", STATUS_PILL[r.status])}>
+                          {r.status === "pendiente" ? "Pendiente" : r.status === "aprobada" ? "Aprobada" : r.status === "corregida" ? "Corregida" : "Rechazada"}
+                        </span>
+                        {r.recibo_numero && <span className="text-sm font-mono text-muted-foreground">#{r.recibo_numero}</span>}
                         {r.parent_id && (
                           isCorrectionOfApproved(r)
-                            ? <Badge className="text-xs bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100">Corrección solicitada</Badge>
-                            : <Badge variant="outline" className="text-xs">Relanzada</Badge>
+                            ? <span className="rounded-lg bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-700">Corrección solicitada</span>
+                            : <span className="rounded-lg bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700">Relanzada</span>
                         )}
                         {alertN && alertN >= 2 && (
-                          <Badge variant="destructive" className="gap-1" title={`${alertN} facturas con esta cédula en los últimos 7 días`}>
+                          <span className="flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-xs font-bold text-rose-700" title={`${alertN} facturas con esta cédula en los últimos 7 días`}>
                             <AlertTriangle className="h-3 w-3" /> {alertN} en 7 días
-                          </Badge>
+                          </span>
                         )}
                       </div>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        <span className="font-medium text-foreground">{DOC_TYPE_LABELS[r.document_type ?? ""] ?? r.document_type ?? "—"}</span>
-                        {" · "}ID {r.identificacion} · {r.concepto ?? "Matrícula"} · {r.tipo_programa ?? ""} {r.programa} · {r.periodo}
-                      </p>
-                      {r.comercial_nombre && (
-                        <p className="text-xs text-muted-foreground">Comercial: {r.comercial_nombre} ({r.comercial_email})</p>
-                      )}
-                      {r.asesor_nombre && (
-                        <p className="text-xs text-muted-foreground">Asesor: {r.asesor_nombre}</p>
-                      )}
-                      {r.observaciones && (
-                        <p className="mt-2 rounded bg-muted px-2 py-1 text-xs text-foreground">Obs: {r.observaciones}</p>
-                      )}
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-muted-foreground">
+                        <span className="font-bold text-foreground/80">{DOC_TYPE_LABELS[r.document_type ?? ""] ?? r.document_type ?? "—"}</span>
+                        <span className="text-muted-foreground/40">•</span>
+                        <span>ID {r.identificacion}</span>
+                        <span className="text-muted-foreground/40">•</span>
+                        <span className="truncate">{r.concepto ?? "Matrícula"} · {r.tipo_programa ?? ""} {r.programa}</span>
+                      </div>
                       {r.status === "rechazada" && r.rejection_reason && (
-                        <p className="mt-2 rounded bg-destructive/10 px-2 py-1 text-xs text-destructive">Motivo: {r.rejection_reason}</p>
+                        <p className="w-fit rounded-lg border border-rose-100/60 bg-rose-50/50 px-2.5 py-1 text-sm font-medium text-rose-600">
+                          Motivo: {r.rejection_reason}
+                        </p>
                       )}
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        Enviada {formatDate(r.created_at)}
-                        {r.approved_at && ` · Aprobada ${formatDate(r.approved_at)}`}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-muted-foreground">Valor a pagar</p>
-                      <p className="text-lg font-bold text-foreground">{formatCOP(r.valor_total_empresa ?? r.valor_total)}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Valor {formatCOP(r.matricula)} · Desc. {Number(r.descuento_pct ?? 0)}%
-                        {Number(r.descuento_bono ?? 0) > 0 && ` · Bono ${formatCOP(r.descuento_bono)}`}
-                      </p>
                     </div>
                   </div>
 
-                  <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
-                    {!isCartera && canApprove && r.status === "pendiente" && (
-                      <>
-                        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white border-0" onClick={() => openApprove(r)}>
-                          <CheckCircle2 className="mr-2 h-4 w-4" /> Aprobar
-                        </Button>
-                        <Button size="sm" className="bg-rose-600 hover:bg-rose-700 text-white border-0" onClick={() => {
-                          setRejecting(r);
-                          const existing = r.rejection_reason ?? "";
-                          const match = REJECT_OPTIONS.find(o => existing.startsWith(o.category));
-                          if (match) {
-                            setRejectCategory(match.category);
-                            if (match.category === "Otra razón") {
-                              setRejectOtherText(existing.replace("Otra razón — ", ""));
-                            } else {
-                              const prefix = `${match.category} — ${match.description ?? ""}`;
-                              const rest = existing.startsWith(prefix) ? existing.slice(prefix.length) : "";
-                              setRejectOtherText(rest.startsWith(" · ") ? rest.slice(3) : "");
-                            }
-                          } else if (existing) {
-                            setRejectCategory("Otra razón");
-                            setRejectOtherText(existing);
-                          } else {
-                            setRejectCategory(""); setRejectOtherText("");
-                          }
-                        }}>
-                          <XCircle className="mr-2 h-4 w-4" /> Rechazar
-                        </Button>
-
-                      </>
-                    )}
-                    {(r.document_type === "orden_matricula" || r.document_type === "factura_usa") && (
-                      <Button size="sm" variant="outline" className="border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-blue-600 hover:text-white" onClick={() => openPdfPreview(r)}>
-                        <Eye className="mr-2 h-4 w-4" /> Ver PDF
-                      </Button>
-                    )}
-                    <Button size="sm" variant="outline" className="border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-blue-600 hover:text-white" onClick={() => setPreviewing(r)}>
-                      <Eye className="mr-2 h-4 w-4" /> Ver Datos
-                    </Button>
-                    {!isCartera && (r.status === "aprobada" || r.status === "corregida") && (
-                      withinCorrectionWindow(r.approved_at) ? (
-                        <Link href={`/solicitar?id=${r.id}`}>
-                          <Button size="sm" variant="outline" className="border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-indigo-600 hover:text-white">
-                            <Wrench className="mr-2 h-4 w-4" /> Corregir
+                  {/* Panel de precio y acciones instantáneas */}
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    <div className="text-right">
+                      <span className="block text-xs font-bold uppercase tracking-widest text-muted-foreground">Valor a pagar</span>
+                      <span className="text-xl font-extrabold text-foreground">{formatCOP(r.valor_total_empresa ?? r.valor_total)}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                      {!isCartera && canApprove && r.status === "pendiente" && (
+                        <>
+                          <Button
+                            size="sm"
+                            className="rounded-xl bg-emerald-600 opacity-100 shadow-sm transition-opacity hover:bg-emerald-700 sm:opacity-0 sm:group-hover:opacity-100 border-0 text-white"
+                            onClick={() => openApprove(r)}
+                          >
+                            <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Aprobar
                           </Button>
-                        </Link>
-                      ) : (
-                        <Button size="sm" variant="outline" disabled title="Ya pasaron más de 3 días desde la aprobación — no se puede corregir.">
-                          <Wrench className="mr-2 h-4 w-4" /> Corregir
-                        </Button>
-                      )
-                    )}
-                    {!isCartera && r.status !== "aprobada" && r.status !== "corregida" && (
-                      <Link href={`/solicitar?id=${r.id}`}>
-                        <Button size="sm" variant="outline" className="border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-indigo-600 hover:text-white">
-                          <Pencil className="mr-2 h-4 w-4" /> Editar
-                        </Button>
-                      </Link>
-                    )}
-                    {(r.status === "aprobada" || r.status === "corregida") && (
-                      <Button size="sm" variant="outline" className="border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-blue-600 hover:text-white" onClick={() => downloadPdf(r)}>
-                        <FileDown className="mr-2 h-4 w-4" /> Descargar PDF
+                          <Button
+                            size="sm"
+                            className="rounded-xl bg-rose-600 opacity-100 shadow-sm transition-opacity hover:bg-rose-700 sm:opacity-0 sm:group-hover:opacity-100 border-0 text-white"
+                            onClick={() => openRejectDialog(r)}
+                          >
+                            <XCircle className="mr-1.5 h-3.5 w-3.5" /> Rechazar
+                          </Button>
+                        </>
+                      )}
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 rounded-xl bg-muted text-muted-foreground hover:bg-muted/70"
+                        onClick={() => { setPreviewing(r); setDetailTab("general"); }}
+                        title="Ver detalle"
+                      >
+                        <ChevronRight className="h-4 w-4" />
                       </Button>
-                    )}
-                    {!isCartera && (r.status === "aprobada" || r.status === "corregida") && (
-                      <Button size="sm" variant="outline" className="border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-slate-600 hover:text-white" onClick={() => duplicar(r)}>
-                        <Copy className="mr-2 h-4 w-4" /> Duplicar
-                      </Button>
-                    )}
-                    {(role === "financiera" || role === "cartera")
-                      && (r.status === "aprobada" || r.status === "rechazada" || r.status === "corregida")
-                      && !r.archived_by_reviewer && (
-                      <Button size="sm" variant="outline" className="ml-auto border-slate-200 text-slate-500 transition-colors hover:border-transparent hover:bg-red-700 hover:text-white" onClick={() => hideForReviewer(r)}>
-                        <Trash2 className="mr-2 h-4 w-4" /> Eliminar
-                      </Button>
-                    )}
-                    {canDelete && (
-                      <Button size="sm" className="ml-auto bg-red-800 hover:bg-red-900 text-white border-0" onClick={() => removeRequest(r)}>
-                        <Trash2 className="mr-2 h-4 w-4" /> Eliminar
-                      </Button>
-                    )}
+                    </div>
                   </div>
                 </div>
               );
@@ -723,6 +790,8 @@ export default function AdminPanel() {
           </div>
         )}
       </div>
+      </>
+      )}
 
       {/* Aprobar */}
       <Dialog open={!!approving} onOpenChange={(o) => !o && setApproving(null)}>
@@ -843,198 +912,288 @@ export default function AdminPanel() {
         </DialogContent>
       </Dialog>
 
-      {/* Ver Datos */}
-      <Dialog open={!!previewing} onOpenChange={(o) => !o && setPreviewing(null)}>
-        <DialogContent className="max-w-5xl max-h-[88vh] overflow-y-auto p-0 gap-0">
-          {previewing && (() => {
+      {/* Vista de detalle (ocupa toda la página, seccionada como un correo abierto) */}
+      {previewing && (() => {
             const isPersonaFlow = previewing.document_type !== "orden_matricula";
             const isJuridica = previewing.tipo_persona === "Persona Jurídica";
             const participantes = previewing.participantes ?? [];
+            const historicalAttachments = previewing.parent_id
+              ? itemsById.get(previewing.parent_id)?.attachments ?? []
+              : [];
+            const hasCurrentAttachments = (previewing.attachments && previewing.attachments.length > 0) || previewing.approved_pdf_path;
+            const hasHistoricalAttachments = historicalAttachments.length > 0;
+            const TABS: { id: typeof detailTab; label: string; icon: typeof User }[] = [
+              { id: "general", label: "General", icon: User },
+              { id: "academico", label: "Académico", icon: GraduationCap },
+              { id: "pago", label: "Pago", icon: DollarSign },
+              { id: "adjuntos", label: "Adjuntos", icon: Paperclip },
+            ];
             return (
-              <>
-                <DialogHeader className="px-6 py-4 border-b border-border">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <DialogTitle>{previewing.nombre}</DialogTitle>
-                    <StatusBadge s={previewing.status} />
-                    {previewing.recibo_numero && (
-                      <span className="text-xs font-mono text-muted-foreground">#{previewing.recibo_numero}</span>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {DOC_TYPE_LABELS[previewing.document_type ?? ""] ?? previewing.document_type ?? "—"}
-                  </p>
-                </DialogHeader>
-
-                <div className="space-y-7 px-8 py-6">
-                  <DetailSection title={isPersonaFlow ? "Datos del tercero" : "Datos del estudiante"}>
-                    {isPersonaFlow && (
-                      <div className="sm:col-span-2">
-                        <span className={cn(
-                          "inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold",
-                          isJuridica ? "bg-indigo-100 text-indigo-700" : "bg-teal-100 text-teal-700",
-                        )}>
-                          {previewing.tipo_persona ?? "Sin especificar"}
-                        </span>
+              <div className="space-y-3 pb-4">
+                <div>
+                  {/* Contenido seccionado por pestañas */}
+                  <div>
+                    <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+                      <div className="flex gap-1 border-b border-border bg-muted/30 p-1">
+                        {TABS.map((t) => {
+                          const Icon = t.icon;
+                          const active = detailTab === t.id;
+                          return (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => setDetailTab(t.id)}
+                              className={cn(
+                                "flex flex-1 items-center justify-center gap-1.5 rounded-xl py-1.5 text-xs font-semibold transition-all",
+                                active ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground",
+                              )}
+                            >
+                              <Icon className="h-3.5 w-3.5" /> {t.label}
+                            </button>
+                          );
+                        })}
                       </div>
-                    )}
-                    {isPersonaFlow && isJuridica ? (
-                      <>
-                        <PreviewRow label="Empresa" value={previewing.empresa ?? previewing.nombre} />
-                        <PreviewRow label="Número de Identificación" value={previewing.nit ?? previewing.identificacion} />
-                        <PreviewRow label="País" value={previewing.pais ?? "—"} />
-                        <PreviewRow label="Ciudad" value={previewing.ciudad ?? "—"} />
-                        <div className="sm:col-span-2"><PreviewRow label="Dirección" value={previewing.direccion ?? "—"} /></div>
-                      </>
-                    ) : (
-                      <>
-                        <PreviewRow label={isPersonaFlow ? "Nombre" : "Estudiante"} value={previewing.nombre} />
-                        <PreviewRow label="Identificación" value={previewing.identificacion} />
-                        {!isPersonaFlow && <PreviewRow label="Tipo de financiación" value={previewing.tipo_persona ?? "—"} />}
-                      </>
-                    )}
-                    <PreviewRow label="Correo" value={previewing.email ?? "—"} />
-                    <PreviewRow label="Teléfono" value={previewing.telefono ?? "—"} />
-                  </DetailSection>
 
-                  <DetailSection title="Programa">
-                    <PreviewRow label="Concepto" value={previewing.concepto ?? "—"} />
-                    <PreviewRow label="Tipo de programa" value={previewing.tipo_programa ?? "—"} />
-                    <div className="sm:col-span-2"><PreviewRow label="Programa" value={previewing.programa} /></div>
-                    {!isPersonaFlow && <PreviewRow label="SNIES" value={previewing.codigo_snies ?? "—"} />}
-                    {isPersonaFlow && <PreviewRow label="Nemónico" value={previewing.nemonico ?? "—"} />}
-                    <PreviewRow label="Cohorte" value={previewing.cohorte ?? "—"} />
-                    <PreviewRow label="Periodo" value={previewing.periodo} />
-                    <PreviewRow label="Fecha inicio" value={previewing.fecha_inicio ?? "—"} />
-                    {previewing.fecha_fin && <PreviewRow label="Fecha fin" value={previewing.fecha_fin} />}
-                    {previewing.horas_programa != null && <PreviewRow label="Horas / duración" value={String(previewing.horas_programa)} />}
-                    {previewing.convocatoria && <PreviewRow label="Convocatoria" value={previewing.convocatoria} />}
-                  </DetailSection>
+                      <div className="max-h-[62vh] overflow-y-auto p-5 space-y-5">
+                        {detailTab === "general" && (
+                          <>
+                            <DetailSection title={isPersonaFlow ? "Datos del tercero" : "Datos del estudiante"}>
+                              {isPersonaFlow && (
+                                <div className="sm:col-span-2">
+                                  <span className={cn(
+                                    "inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold",
+                                    isJuridica ? "bg-indigo-100 text-indigo-700" : "bg-teal-100 text-teal-700",
+                                  )}>
+                                    {previewing.tipo_persona ?? "Sin especificar"}
+                                  </span>
+                                </div>
+                              )}
+                              {isPersonaFlow && isJuridica ? (
+                                <>
+                                  <PreviewRow label="Empresa" value={previewing.empresa ?? previewing.nombre} />
+                                  <PreviewRow label="Número de Identificación" value={previewing.nit ?? previewing.identificacion} />
+                                  <PreviewRow label="País" value={previewing.pais ?? "—"} />
+                                  <PreviewRow label="Ciudad" value={previewing.ciudad ?? "—"} />
+                                  <div className="sm:col-span-2"><PreviewRow label="Dirección" value={previewing.direccion ?? "—"} /></div>
+                                </>
+                              ) : (
+                                <>
+                                  <PreviewRow label={isPersonaFlow ? "Nombre" : "Estudiante"} value={previewing.nombre} />
+                                  <PreviewRow label="Identificación" value={previewing.identificacion} />
+                                  {!isPersonaFlow && <PreviewRow label="Tipo de financiación" value={previewing.tipo_persona ?? "—"} />}
+                                </>
+                              )}
+                              <PreviewRow label="Correo" value={previewing.email ?? "—"} />
+                              <PreviewRow label="Teléfono" value={previewing.telefono ?? "—"} />
+                            </DetailSection>
 
-                  <DetailSection title="Valores">
-                    {previewing.valor_parcial != null ? (
-                      <>
-                        <PreviewRow label="Valor de matrícula" value={formatCOP(previewing.matricula)} />
-                        <PreviewRow label="Valor parcial a facturar" value={formatCOP(previewing.valor_parcial)} />
-                      </>
-                    ) : (
-                      <>
-                        <PreviewRow label="Matrícula" value={formatCOP(previewing.matricula)} />
-                        <PreviewRow label="Descuento %" value={`${previewing.descuento_pct}%`} />
-                        <PreviewRow label="Descuento bono" value={formatCOP(previewing.descuento_bono ?? 0)} />
-                      </>
-                    )}
-                    <PreviewRow label="Valor total a pagar" value={formatCOP(previewing.valor_total)} />
-                    {previewing.valor_total_empresa != null && (
-                      <PreviewRow label="Valor total empresa" value={formatCOP(previewing.valor_total_empresa)} />
-                    )}
-                    <PreviewRow label="Recargo por mora" value={formatCOP(previewing.recargo_total)} />
-                    <PreviewRow label="Límite de pago" value={previewing.fecha_limite_pago ?? "—"} />
-                    <PreviewRow label="Pago extraordinario" value={previewing.fecha_pago_extraordinario ?? "—"} />
-                  </DetailSection>
-
-                  {participantes.length > 0 && (
-                    <DetailSection title={`Participantes (${participantes.length})`} noGrid>
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        {participantes.map((p, i) => (
-                          <div key={i} className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs space-y-0.5">
-                            <p className="font-semibold text-foreground">{i + 1}. {p.nombre || "—"}</p>
-                            {p.cedula && <p className="text-muted-foreground">ID: {p.cedula}</p>}
-                            {p.email && <p className="text-muted-foreground">{p.email}</p>}
-                            {p.telefono && <p className="text-muted-foreground">Tel: {p.telefono}</p>}
-                          </div>
-                        ))}
-                      </div>
-                    </DetailSection>
-                  )}
-
-                  <DetailSection title="Estado y seguimiento">
-                    <PreviewRow label="Líder Comercial" value={previewing.comercial_nombre ?? "—"} />
-                    <PreviewRow label="Correo Líder Comercial" value={previewing.comercial_email ?? "—"} />
-                    <PreviewRow label="Asesor Comercial" value={previewing.asesor_nombre ?? "—"} />
-                    <PreviewRow label="Creada" value={formatDate(previewing.created_at)} />
-                    {previewing.approved_at && <PreviewRow label="Aprobada" value={formatDate(previewing.approved_at)} />}
-                    {previewing.observaciones && (
-                      <div className="sm:col-span-2">
-                        <p className="text-xs uppercase tracking-wider text-muted-foreground">Observaciones</p>
-                        <p className="mt-0.5 text-foreground">{previewing.observaciones}</p>
-                      </div>
-                    )}
-                    {previewing.rejection_reason && (
-                      <div className="sm:col-span-2 rounded-lg bg-destructive/10 px-3 py-2">
-                        <p className="text-xs uppercase tracking-wider text-destructive">Motivo de rechazo</p>
-                        <p className="mt-0.5 text-destructive">{previewing.rejection_reason}</p>
-                      </div>
-                    )}
-                  </DetailSection>
-
-                  {(() => {
-                    const historicalAttachments = previewing.parent_id
-                      ? itemsById.get(previewing.parent_id)?.attachments ?? []
-                      : [];
-                    const hasCurrent = (previewing.attachments && previewing.attachments.length > 0) || previewing.approved_pdf_path;
-                    const hasHistorical = historicalAttachments.length > 0;
-                    if (!hasCurrent && !hasHistorical) return null;
-                    return (
-                      <DetailSection title="Adjuntos" noGrid>
-                        <div className="space-y-3">
-                          {hasHistorical && (
-                            <div className="space-y-1.5">
-                              <p className="text-xs font-medium text-muted-foreground">
-                                Archivos de la solicitud rechazada original (historial)
-                              </p>
-                              <div className="grid gap-2 sm:grid-cols-2">
-                                {historicalAttachments.map((a) => (
-                                  <button
-                                    key={a.path}
-                                    type="button"
-                                    onClick={() => openAttachment(a.path)}
-                                    className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-left text-xs hover:bg-muted/60 transition-colors"
-                                  >
-                                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                    <span className="min-w-0 flex-1 truncate font-medium text-foreground">{a.name}</span>
-                                    <span className="shrink-0 text-muted-foreground">{(a.size / 1024).toFixed(0)} KB</span>
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          <div className="grid gap-2 sm:grid-cols-2">
-                            {previewing.attachments?.map((a) => (
-                              <button
-                                key={a.path}
-                                type="button"
-                                onClick={() => openAttachment(a.path)}
-                                className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-left text-xs hover:bg-muted/60 transition-colors"
-                              >
-                                <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                <span className="min-w-0 flex-1 truncate font-medium text-foreground">{a.name}</span>
-                                <span className="shrink-0 text-muted-foreground">{(a.size / 1024).toFixed(0)} KB</span>
-                              </button>
-                            ))}
-                            {previewing.approved_pdf_path && (
-                              <button
-                                type="button"
-                                onClick={() => openAttachment(previewing.approved_pdf_path!)}
-                                className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-left text-xs hover:bg-blue-100 transition-colors"
-                              >
-                                <FileDown className="h-4 w-4 shrink-0 text-blue-700" />
-                                <span className="min-w-0 flex-1 truncate font-medium text-blue-700">PDF oficial aprobado</span>
-                              </button>
+                            {participantes.length > 0 && (
+                              <DetailSection title={`Participantes (${participantes.length})`} noGrid>
+                                <div className="grid gap-2 sm:grid-cols-2">
+                                  {participantes.map((p, i) => (
+                                    <div key={i} className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs space-y-0.5">
+                                      <p className="font-semibold text-foreground">{i + 1}. {p.nombre || "—"}</p>
+                                      {p.cedula && <p className="text-muted-foreground">ID: {p.cedula}</p>}
+                                      {p.email && <p className="text-muted-foreground">{p.email}</p>}
+                                      {p.telefono && <p className="text-muted-foreground">Tel: {p.telefono}</p>}
+                                    </div>
+                                  ))}
+                                </div>
+                              </DetailSection>
                             )}
-                          </div>
-                        </div>
-                      </DetailSection>
-                    );
-                  })()}
+
+                            <DetailSection title="Estado y seguimiento">
+                              <PreviewRow label="Líder Comercial" value={previewing.comercial_nombre ?? "—"} />
+                              <PreviewRow label="Correo Líder Comercial" value={previewing.comercial_email ?? "—"} />
+                              <PreviewRow label="Asesor Comercial" value={previewing.asesor_nombre ?? "—"} />
+                              <PreviewRow label="Creada" value={formatDate(previewing.created_at)} />
+                              {previewing.approved_at && <PreviewRow label="Aprobada" value={formatDate(previewing.approved_at)} />}
+                              {previewing.observaciones && (
+                                <div className="sm:col-span-2">
+                                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Observaciones</p>
+                                  <p className="mt-0.5 text-foreground">{previewing.observaciones}</p>
+                                </div>
+                              )}
+                              {previewing.rejection_reason && (
+                                <div className="sm:col-span-2 rounded-lg bg-destructive/10 px-3 py-2">
+                                  <p className="text-xs uppercase tracking-wider text-destructive">⚠️ Motivo de rechazo</p>
+                                  <p className="mt-0.5 text-destructive">{previewing.rejection_reason}</p>
+                                </div>
+                              )}
+                            </DetailSection>
+                          </>
+                        )}
+
+                        {detailTab === "academico" && (
+                          <DetailSection title="Programa">
+                            <PreviewRow label="Concepto" value={previewing.concepto ?? "—"} />
+                            <PreviewRow label="Tipo de programa" value={previewing.tipo_programa ?? "—"} />
+                            <div className="sm:col-span-2"><PreviewRow label="Programa" value={previewing.programa} /></div>
+                            {!isPersonaFlow && <PreviewRow label="SNIES" value={previewing.codigo_snies ?? "—"} />}
+                            {isPersonaFlow && <PreviewRow label="Nemónico" value={previewing.nemonico ?? "—"} />}
+                            <PreviewRow label="Cohorte" value={previewing.cohorte ?? "—"} />
+                            <PreviewRow label="Periodo" value={previewing.periodo} />
+                            <PreviewRow label="Fecha inicio" value={previewing.fecha_inicio ?? "—"} />
+                            {previewing.fecha_fin && <PreviewRow label="Fecha fin" value={previewing.fecha_fin} />}
+                            {previewing.horas_programa != null && <PreviewRow label="Horas / duración" value={String(previewing.horas_programa)} />}
+                            {previewing.convocatoria && <PreviewRow label="Convocatoria" value={previewing.convocatoria} />}
+                          </DetailSection>
+                        )}
+
+                        {detailTab === "pago" && (
+                          <DetailSection title="Valores">
+                            {previewing.valor_parcial != null ? (
+                              <>
+                                <PreviewRow label="Valor de matrícula" value={formatCOP(previewing.matricula)} />
+                                <PreviewRow label="Valor parcial a facturar" value={formatCOP(previewing.valor_parcial)} />
+                              </>
+                            ) : (
+                              <>
+                                <PreviewRow label="Matrícula" value={formatCOP(previewing.matricula)} />
+                                <PreviewRow label="Descuento %" value={`${previewing.descuento_pct}%`} />
+                                <PreviewRow label="Descuento bono" value={formatCOP(previewing.descuento_bono ?? 0)} />
+                              </>
+                            )}
+                            <PreviewRow label="Valor total a pagar" value={formatCOP(previewing.valor_total)} />
+                            {previewing.valor_total_empresa != null && (
+                              <PreviewRow label="Valor total empresa" value={formatCOP(previewing.valor_total_empresa)} />
+                            )}
+                            <PreviewRow label="Recargo por mora" value={formatCOP(previewing.recargo_total)} />
+                            <PreviewRow label="Límite de pago" value={previewing.fecha_limite_pago ?? "—"} />
+                            <PreviewRow label="Pago extraordinario" value={previewing.fecha_pago_extraordinario ?? "—"} />
+                          </DetailSection>
+                        )}
+
+                        {detailTab === "adjuntos" && (
+                          !hasCurrentAttachments && !hasHistoricalAttachments ? (
+                            <p className="text-sm text-muted-foreground">Esta solicitud no tiene archivos adjuntos.</p>
+                          ) : (
+                            <DetailSection title="Adjuntos" noGrid>
+                              <div className="space-y-3">
+                                {hasHistoricalAttachments && (
+                                  <div className="space-y-1.5">
+                                    <p className="text-xs font-medium text-muted-foreground">
+                                      Archivos de la solicitud rechazada original (historial)
+                                    </p>
+                                    <div className="grid gap-2 sm:grid-cols-2">
+                                      {historicalAttachments.map((a) => (
+                                        <button
+                                          key={a.path}
+                                          type="button"
+                                          onClick={() => openAttachment(a.path)}
+                                          className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-left text-xs hover:bg-muted/60 transition-colors"
+                                        >
+                                          <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                          <span className="min-w-0 flex-1 truncate font-medium text-foreground">{a.name}</span>
+                                          <span className="shrink-0 text-muted-foreground">{(a.size / 1024).toFixed(0)} KB</span>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                <div className="grid gap-2 sm:grid-cols-2">
+                                  {previewing.attachments?.map((a) => (
+                                    <button
+                                      key={a.path}
+                                      type="button"
+                                      onClick={() => openAttachment(a.path)}
+                                      className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-left text-xs hover:bg-muted/60 transition-colors"
+                                    >
+                                      <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                      <span className="min-w-0 flex-1 truncate font-medium text-foreground">{a.name}</span>
+                                      <span className="shrink-0 text-muted-foreground">{(a.size / 1024).toFixed(0)} KB</span>
+                                    </button>
+                                  ))}
+                                  {previewing.approved_pdf_path && (
+                                    <button
+                                      type="button"
+                                      onClick={() => openAttachment(previewing.approved_pdf_path!)}
+                                      className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-left text-xs hover:bg-blue-100 transition-colors"
+                                    >
+                                      <FileDown className="h-4 w-4 shrink-0 text-blue-700" />
+                                      <span className="min-w-0 flex-1 truncate font-medium text-blue-700">PDF oficial aprobado</span>
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </DetailSection>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </>
+
+                {/* Barra de acciones, fija al fondo de la pantalla — una sola fila, discreta */}
+                <div className="sticky bottom-0 left-0 right-0 -mx-6 border-t border-border bg-card/95 px-6 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] backdrop-blur">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button size="sm" variant="ghost" className="rounded-full" onClick={() => setPreviewing(null)}>
+                      <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Bandeja
+                    </Button>
+                    {(previewing.document_type === "orden_matricula" || previewing.document_type === "factura_usa") && (
+                      <Button size="sm" variant="outline" className="rounded-full" onClick={() => openPdfPreview(previewing)}>
+                        <Eye className="mr-1.5 h-3.5 w-3.5" /> Ver PDF
+                      </Button>
+                    )}
+                    {!isCartera && (previewing.status === "aprobada" || previewing.status === "corregida") ? (
+                      withinCorrectionWindow(previewing.approved_at) ? (
+                        <Link href={`/solicitar?id=${previewing.id}`}>
+                          <Button size="sm" variant="outline" className="rounded-full">
+                            <Wrench className="mr-1.5 h-3.5 w-3.5" /> Corregir
+                          </Button>
+                        </Link>
+                      ) : (
+                        <Button size="sm" variant="outline" className="rounded-full" disabled title="Ya pasaron más de 3 días desde la aprobación — no se puede corregir.">
+                          <Wrench className="mr-1.5 h-3.5 w-3.5" /> Corregir
+                        </Button>
+                      )
+                    ) : !isCartera && (
+                      <Link href={`/solicitar?id=${previewing.id}`}>
+                        <Button size="sm" variant="outline" className="rounded-full">
+                          <Pencil className="mr-1.5 h-3.5 w-3.5" /> Editar
+                        </Button>
+                      </Link>
+                    )}
+                    {(previewing.status === "aprobada" || previewing.status === "corregida") && (
+                      <Button size="sm" variant="outline" className="rounded-full" onClick={() => downloadPdf(previewing)}>
+                        <FileDown className="mr-1.5 h-3.5 w-3.5" /> Descargar PDF
+                      </Button>
+                    )}
+                    {!isCartera && (previewing.status === "aprobada" || previewing.status === "corregida") && (
+                      <Button size="sm" variant="outline" className="rounded-full" onClick={() => duplicar(previewing)}>
+                        <Copy className="mr-1.5 h-3.5 w-3.5" /> Duplicar
+                      </Button>
+                    )}
+
+                    <div className="ml-auto flex items-center gap-2">
+                      {(role === "financiera" || role === "cartera")
+                        && (previewing.status === "aprobada" || previewing.status === "rechazada" || previewing.status === "corregida")
+                        && !previewing.archived_by_reviewer && (
+                        <Button size="sm" variant="outline" className="rounded-full text-red-700 border-red-200 hover:bg-red-700 hover:text-white" onClick={() => hideForReviewer(previewing)}>
+                          <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Eliminar
+                        </Button>
+                      )}
+                      {canDelete && (
+                        <Button size="sm" variant="outline" className="rounded-full text-red-700 border-red-200 hover:bg-red-700 hover:text-white" onClick={() => removeRequest(previewing)}>
+                          <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Eliminar definitivamente
+                        </Button>
+                      )}
+                      {!isCartera && canApprove && previewing.status === "pendiente" && (
+                        <>
+                          <Button size="sm" className="rounded-full bg-rose-600 hover:bg-rose-700 text-white border-0" onClick={() => openRejectDialog(previewing)}>
+                            <XCircle className="mr-1.5 h-3.5 w-3.5" /> Rechazar Solicitud
+                          </Button>
+                          <Button size="sm" className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white border-0" onClick={() => openApprove(previewing)}>
+                            <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Aprobar Solicitud
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
             );
           })()}
-          <DialogFooter className="px-6 py-3 border-t border-border">
-            <Button variant="outline" onClick={() => setPreviewing(null)}>Cerrar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Dialog: Ver PDF */}
       <Dialog open={pdfPreviewOpen} onOpenChange={(o) => { if (!o) { setPdfPreviewOpen(false); setPdfPreviewUrl(null); } }}>
@@ -1068,33 +1227,3 @@ export default function AdminPanel() {
   );
 }
 
-function DetailSection({ title, children, noGrid }: { title: string; children: ReactNode; noGrid?: boolean }) {
-  return (
-    <div>
-      <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border pb-2 mb-4">
-        {title}
-      </h3>
-      {noGrid ? children : <div className="grid gap-x-8 gap-y-5 text-sm sm:grid-cols-2">{children}</div>}
-    </div>
-  );
-}
-
-function PreviewRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-xs uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className="mt-1 text-[15px] font-medium text-foreground">{value}</p>
-    </div>
-  );
-}
-
-function StatusBadge({ s }: { s: Status }) {
-  const map: Record<Status, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-    pendiente: { label: "Pendiente", variant: "secondary" },
-    aprobada: { label: "Aprobada", variant: "default" },
-    rechazada: { label: "Rechazada", variant: "destructive" },
-    corregida: { label: "Corregida", variant: "outline" },
-  };
-  const m = map[s];
-  return <Badge variant={m.variant}>{m.label}</Badge>;
-}

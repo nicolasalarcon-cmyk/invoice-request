@@ -13,6 +13,11 @@ node_modules
 # Build output
 dist
 dist-ssr
+.next/
+tsconfig.tsbuildinfo
+
+# Local Claude Code tooling (dev-server launch config, not project config)
+.claude/
 
 # TanStack / Vite / Nitro internals
 .output

@@ -1,10 +1,6 @@
 export const formatCOP = (n: number | string | null | undefined): string => {
   const v = typeof n === "string" ? Number(n) : n ?? 0;
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    maximumFractionDigits: 0,
-  }).format(v);
+  return "$ " + new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 }).format(v);
 };
 
 export const formatDate = (d: string | Date | null | undefined): string => {
