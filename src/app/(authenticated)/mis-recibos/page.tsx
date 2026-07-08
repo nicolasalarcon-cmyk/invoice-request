@@ -7,12 +7,12 @@ import { useAuth } from "@/lib/auth";
 import { useLiveRefresh } from "@/lib/use-live-refresh";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { formatCOP, formatDate } from "@/lib/format";
 import {
-  FileDown, FilePlus, Inbox, Search, Pencil, Trash2, Copy, Wrench, Eye, ArrowLeft,
+  FileDown, Inbox, Search, Pencil, Trash2, Copy, Wrench, Eye, ArrowLeft,
   Receipt, Globe, Landmark, Wallet, User, GraduationCap, DollarSign, Paperclip,
+  Calendar, X, ChevronRight,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { DetailSection, PreviewRow } from "@/components/solicitudes/detail-panel";
@@ -30,13 +30,6 @@ const DOC_TYPE_LABELS: Record<string, string> = {
   factura_usa: "Factura USA",
   factura_colombia: "Factura Colombia",
   factura_paypal: "Factura PayPal",
-};
-
-const DOC_TYPE_ICONS: Record<string, typeof Receipt> = {
-  orden_matricula: Receipt,
-  factura_usa: Globe,
-  factura_colombia: Landmark,
-  factura_paypal: Wallet,
 };
 
 const formatCedula = (id: string) => {
@@ -126,7 +119,8 @@ export default function MisRecibos() {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | Status>("all");
-  const [tipoFilter, setTipoFilter] = useState<string>("all");
+  const [tipoFilter, setTipoFilter] = useState<"all" | DocType>("all");
+  const [dateFrom, setDateFrom] = useState<string>("");
   const [previewing, setPreviewing] = useState<Req | null>(null);
   const [detailTab, setDetailTab] = useState<"general" | "academico" | "pago" | "adjuntos">("general");
 
@@ -147,26 +141,48 @@ export default function MisRecibos() {
 
   useLiveRefresh("mis_recibos_inbox", load, !!user);
 
-  const tipos = useMemo(() => {
-    const s = new Set<string>();
-    items.forEach((i) => i.tipo_programa && s.add(i.tipo_programa));
-    return [...s];
-  }, [items]);
+  const visibleItems = useMemo(() => {
+    const s = q.toLowerCase().trim();
+    if (!s) return items;
+    return items.filter((r) =>
+      r.nombre.toLowerCase().includes(s) ||
+      r.identificacion.includes(s) ||
+      String(r.recibo_numero ?? "").includes(s) ||
+      (r.comercial_nombre ?? "").toLowerCase().includes(s) ||
+      (r.asesor_nombre ?? "").toLowerCase().includes(s) ||
+      (r.programa ?? "").toLowerCase().includes(s) ||
+      (r.tipo_programa ?? "").toLowerCase().includes(s) ||
+      (r.concepto ?? "").toLowerCase().includes(s) ||
+      (DOC_TYPE_LABELS[r.document_type ?? ""] ?? "").toLowerCase().includes(s),
+    );
+  }, [items, q]);
+
+  const statusCounts = useMemo(() => ({
+    all: visibleItems.length,
+    pendiente: visibleItems.filter((r) => r.status === "pendiente").length,
+    aprobada: visibleItems.filter((r) => r.status === "aprobada").length,
+    corregida: visibleItems.filter((r) => r.status === "corregida").length,
+    rechazada: visibleItems.filter((r) => r.status === "rechazada").length,
+  }), [visibleItems]);
+
+  const tipoPendingCounts = useMemo(() => {
+    const counts: Partial<Record<DocType, number>> = {};
+    visibleItems.forEach((r) => {
+      if (r.status !== "pendiente" || !r.document_type) return;
+      counts[r.document_type] = (counts[r.document_type] ?? 0) + 1;
+    });
+    return counts;
+  }, [visibleItems]);
 
   const filtered = useMemo(() => {
-    const s = q.toLowerCase().trim();
-    return items.filter((r) => {
+    const fromTs = dateFrom ? new Date(dateFrom).getTime() : 0;
+    return visibleItems.filter((r) => {
       if (statusFilter !== "all" && r.status !== statusFilter) return false;
-      if (tipoFilter !== "all" && r.tipo_programa !== tipoFilter) return false;
-      if (!s) return true;
-      return (
-        r.nombre.toLowerCase().includes(s) ||
-        r.identificacion.includes(s) ||
-        String(r.recibo_numero ?? "").includes(s) ||
-        (r.comercial_nombre ?? "").toLowerCase().includes(s)
-      );
+      if (tipoFilter !== "all" && r.document_type !== tipoFilter) return false;
+      if (fromTs && new Date(r.created_at).getTime() < fromTs) return false;
+      return true;
     });
-  }, [items, q, statusFilter, tipoFilter]);
+  }, [visibleItems, statusFilter, tipoFilter, dateFrom]);
 
   const reqToPdfData = (r: Req) => {
     const x = r as Req & {
@@ -324,35 +340,105 @@ export default function MisRecibos() {
     <main className="mx-auto max-w-7xl px-6 py-4">
       {!previewing && (
       <>
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <Link href="/solicitar">
-          <Button className="rounded-xl"><FilePlus className="mr-2 h-4 w-4" /> Nueva solicitud</Button>
-        </Link>
-      </div>
-
-      <div className="mt-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative flex-1 min-w-64">
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input className="rounded-xl bg-muted/40 pl-9" placeholder="Buscar por estudiante, recibo o asesor…" value={q} onChange={(e) => setQ(e.target.value)} />
+            <Input
+              className="rounded-xl bg-muted/40 pl-9"
+              placeholder="Buscar por estudiante, ID, recibo, asesor, comercial, programa…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
           </div>
-          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
-            <SelectTrigger className="w-44 rounded-xl bg-muted/40"><SelectValue placeholder="Estado" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los estados</SelectItem>
-              <SelectItem value="pendiente">🟡 Pendiente</SelectItem>
-              <SelectItem value="aprobada">🟢 Aprobada</SelectItem>
-              <SelectItem value="corregida">🔵 Corregida</SelectItem>
-              <SelectItem value="rechazada">🔴 Rechazada</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={tipoFilter} onValueChange={setTipoFilter}>
-            <SelectTrigger className="w-44 rounded-xl bg-muted/40"><SelectValue placeholder="Tipo" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los tipos</SelectItem>
-              {tipos.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <div className={cn(
+            "flex shrink-0 items-center gap-1.5 rounded-xl border px-2.5 h-10 transition-all",
+            dateFrom ? "border-primary bg-primary/5" : "border-transparent bg-muted/40",
+          )}>
+            <Calendar className={cn("h-4 w-4", dateFrom ? "text-primary" : "text-muted-foreground")} />
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className={cn(
+                "w-[9.5rem] bg-transparent text-sm outline-none",
+                dateFrom ? "text-foreground font-medium" : "text-muted-foreground",
+              )}
+            />
+            {dateFrom && (
+              <button
+                type="button"
+                onClick={() => setDateFrom("")}
+                className="text-muted-foreground hover:text-foreground"
+                title="Quitar filtro de fecha"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {([
+            { id: "all" as const, label: "Todas", icon: "📋" },
+            { id: "pendiente" as const, label: "Pendientes", icon: "🟡" },
+            { id: "aprobada" as const, label: "Aprobadas", icon: "🟢" },
+            { id: "corregida" as const, label: "Corregidas", icon: "🔵" },
+            { id: "rechazada" as const, label: "Rechazadas", icon: "🔴" },
+          ]).map((c) => {
+            const active = statusFilter === c.id;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setStatusFilter(c.id)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition-all",
+                  active ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted/50 text-muted-foreground hover:bg-muted",
+                )}
+              >
+                <span>{c.icon}</span> {c.label}
+                <span className={cn(
+                  "rounded-full px-1.5 py-0.5 text-xs font-bold",
+                  active ? "bg-white/20" : "bg-background",
+                )}>
+                  {statusCounts[c.id]}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {([
+            { id: "orden_matricula" as const, label: "Orden de Matrícula", icon: Receipt },
+            { id: "factura_usa" as const, label: "Factura USA", icon: Globe },
+            { id: "factura_colombia" as const, label: "Factura Colombia", icon: Landmark },
+            { id: "factura_paypal" as const, label: "Factura PayPal", icon: Wallet },
+          ]).map((t) => {
+            const active = tipoFilter === t.id;
+            const Icon = t.icon;
+            const pendientes = tipoPendingCounts[t.id] ?? 0;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTipoFilter(active ? "all" : t.id)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all",
+                  active ? "border-primary bg-primary text-primary-foreground shadow-sm" : "border-border bg-card text-muted-foreground hover:bg-muted/50",
+                )}
+              >
+                <Icon className="h-3.5 w-3.5" /> {t.label}
+                {pendientes > 0 && (
+                  <span className={cn(
+                    "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+                    active ? "bg-white/20" : "bg-amber-100 text-amber-700",
+                  )}>
+                    {pendientes}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -367,39 +453,49 @@ export default function MisRecibos() {
         ) : (
           <div className="space-y-3">
             {filtered.map((r) => {
-              const DocIcon = DOC_TYPE_ICONS[r.document_type ?? ""] ?? Receipt;
               return (
               <div
                 key={r.id}
                 onClick={() => { setPreviewing(r); setDetailTab("general"); }}
-                className="group cursor-pointer rounded-2xl border border-border bg-card p-4 shadow-sm transition-all hover:shadow-md hover:border-primary/20"
+                className="group relative flex cursor-pointer flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm transition-all duration-200 hover:bg-muted/40 hover:shadow-md md:flex-row md:items-center md:justify-between"
               >
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex min-w-0 flex-1 items-start gap-3">
-                    <div className="mt-0.5 shrink-0 rounded-xl bg-primary/10 p-2 text-primary">
-                      <DocIcon className="h-4 w-4" />
+                <div className="flex min-w-0 flex-1 items-start gap-3.5">
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="block truncate text-lg font-bold text-foreground">{r.nombre}</span>
+                      <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider", STATUS_PILL[r.status])}>
+                        {r.status === "pendiente" ? "Pendiente" : r.status === "aprobada" ? "Aprobada" : r.status === "corregida" ? "Corregida" : "Rechazada"}
+                      </span>
+                      {r.recibo_numero && <span className="text-sm font-mono text-muted-foreground">#{r.recibo_numero}</span>}
                     </div>
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="truncate font-semibold text-foreground">{r.nombre}</span>
-                        <span className={cn("rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider", STATUS_PILL[r.status])}>
-                          {r.status === "pendiente" ? "Pendiente" : r.status === "aprobada" ? "Aprobada" : r.status === "corregida" ? "Corregida" : "Rechazada"}
-                        </span>
-                        {r.recibo_numero && <span className="text-xs font-mono text-muted-foreground">#{r.recibo_numero}</span>}
-                      </div>
-                      <p className="mt-1 truncate text-xs text-muted-foreground">
-                        <span className="font-semibold text-foreground/80">{DOC_TYPE_LABELS[r.document_type ?? ""] ?? r.document_type ?? "—"}</span>
-                        {" · "}ID {r.identificacion} · {r.concepto ?? "Matrícula"} · {r.tipo_programa ?? ""} {r.programa}
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-muted-foreground">
+                      <span className="font-bold text-foreground/80">{DOC_TYPE_LABELS[r.document_type ?? ""] ?? r.document_type ?? "—"}</span>
+                      <span className="text-muted-foreground/40">•</span>
+                      <span>ID {r.identificacion}</span>
+                      <span className="text-muted-foreground/40">•</span>
+                      <span className="truncate">{r.concepto ?? "Matrícula"} · {r.tipo_programa ?? ""} {r.programa}</span>
+                    </div>
+                    {r.status === "rechazada" && r.rejection_reason && (
+                      <p className="w-fit rounded-lg border border-rose-100/60 bg-rose-50/50 px-2.5 py-1 text-sm font-medium text-rose-600">
+                        Motivo: {r.rejection_reason}
                       </p>
-                      {r.status === "rechazada" && r.rejection_reason && (
-                        <p className="mt-1 truncate text-xs text-rose-600">⚠️ {r.rejection_reason}</p>
-                      )}
-                    </div>
+                    )}
                   </div>
-                  <div className="shrink-0 text-right">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Valor a pagar</p>
-                    <p className="text-lg font-extrabold text-foreground">{formatCOP(r.valor_total)}</p>
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  <div className="text-right">
+                    <span className="block text-xs font-bold uppercase tracking-widest text-muted-foreground">Valor a pagar</span>
+                    <span className="text-xl font-extrabold text-foreground">{formatCOP(r.valor_total)}</span>
                   </div>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 rounded-xl bg-muted text-muted-foreground hover:bg-muted/70"
+                    onClick={(e) => { e.stopPropagation(); setPreviewing(r); setDetailTab("general"); }}
+                    title="Ver detalle"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
               );

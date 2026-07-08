@@ -61,7 +61,22 @@ function NavTab({
 }
 
 function NavDivider() {
-  return <div className="mx-1 my-auto h-4 w-px self-center bg-slate-200" />;
+  return <div className="mx-2 my-auto h-6 w-px self-center bg-slate-200" />;
+}
+
+function CreateNavButton() {
+  const pathname = usePathname();
+  const active = pathname === "/solicitar" || pathname.startsWith("/solicitar/");
+  return (
+    <Link
+      href="/solicitar"
+      className={`mx-1.5 flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold text-white shadow-sm transition-all select-none
+        ${active ? "bg-blue-800" : "bg-blue-700 hover:bg-blue-800"}`}
+    >
+      <FilePlus className="h-4 w-4" />
+      Crear
+    </Link>
+  );
 }
 
 export default function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
@@ -134,12 +149,11 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
         <div className="mx-auto max-w-7xl px-4">
           <nav className="flex items-center gap-0.5">
 
-            {/* ── Tabs operativas (orden por frecuencia de uso) ── */}
-            {canViewAllRequests && (
+            {/* ── Tabs operativas — mismo orden para todos los roles: Crear, Solicitudes, Dashboard ── */}
+            <CreateNavButton />
+            {canViewAllRequests ? (
               <NavTab href="/admin" icon={<ClipboardList className="h-4 w-4" />} label="Solicitudes" badge={badgeCount} />
-            )}
-            <NavTab href="/solicitar" icon={<FilePlus className="h-4 w-4" />} label="Crear" />
-            {!canViewAllRequests && (
+            ) : (
               <NavTab href="/mis-recibos" icon={<ClipboardList className="h-4 w-4" />} label="Mis recibos" />
             )}
             {canViewDashboard && (
