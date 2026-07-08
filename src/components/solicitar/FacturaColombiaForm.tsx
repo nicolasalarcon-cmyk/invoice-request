@@ -95,14 +95,7 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
     listAsesores().then(setAsesores).catch(() => setAsesores([]));
   }, []);
 
-  // El jefe de área siempre puede asignarse a sí mismo, aunque no esté en el catálogo.
-  const asesorOptions = useMemo(() => {
-    const nombres = new Set(asesores.map((a) => a.nombre));
-    const propio = profile?.nombre_completo;
-    return propio && !nombres.has(propio)
-      ? [...asesores, { id: "self", nombre: propio, activo: true }]
-      : asesores;
-  }, [asesores, profile]);
+  const asesorOptions = asesores;
 
   const tiposProgramaDisponibles = useMemo(
     () => [...new Set(programas.map((p) => p.tipo_programa).filter((t): t is string => !!t))].sort(),
@@ -224,7 +217,7 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
       const payload = {
         document_type: "factura_colombia",
         tipo_persona: form.tipo_persona,
-        asesor_nombre: form.asesor_nombre,
+        asesor_nombre: form.asesor_nombre || null,
         nombre: isNatural ? form.nombre : form.empresa,
         identificacion: isNatural ? form.cedula : (form.nit || form.empresa.slice(0, 20)),
         email: isNatural ? (form.email_natural || null) : (form.email_empresa || null),
@@ -332,7 +325,7 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
     <form onSubmit={handleSubmit} className="space-y-6">
 
       {/* ── COMERCIAL ── */}
-      <Section title="Datos del Líder Comercial">
+      <Section title={role === "cartera" ? "Datos de Cartera" : "Datos del Líder Comercial"}>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Nombre Completo">
             <Input value={profile?.nombre_completo ?? ""} disabled />
