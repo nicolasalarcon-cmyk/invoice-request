@@ -389,14 +389,14 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
 
       <Section title="Datos del estudiante">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Nombre completo *">
+          <Field label="Nombre Completo *">
             <Input required minLength={2} maxLength={200} value={form.nombre} onChange={(e) => update("nombre", e.target.value)} />
           </Field>
-          <Field label="N° identificación *">
-            <Input required minLength={4} maxLength={30} value={form.identificacion} onChange={(e) => update("identificacion", e.target.value)} />
+          <Field label="Número de Identificación *">
+            <Input required minLength={4} maxLength={30} type="text" inputMode="numeric" value={form.identificacion} onChange={(e) => update("identificacion", e.target.value.replace(/\D/g, ""))} />
           </Field>
           {fieldVisible("email_estudiante") && (
-            <Field label={fieldLabel("email_estudiante", "Correo")}>
+            <Field label={fieldLabel("email_estudiante", "Correo Electrónico")}>
               <Input type="email" maxLength={200} value={form.email} onChange={(e) => update("email", e.target.value)} />
             </Field>
           )}
@@ -415,7 +415,7 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
 
       <Section title="Datos del programa">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Tipo de programa *">
+          <Field label="Tipo de Programa *">
             <Select value={form.tipo_programa} onValueChange={(v) => setForm((f) => ({ ...f, tipo_programa: v, duracion: v.toLowerCase().includes("especial") ? "3 cuatrimestres" : f.duracion }))}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -423,7 +423,7 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
               </SelectContent>
             </Select>
           </Field>
-          <Field label="Nombre del programa">
+          <Field label="Nombre del Programa">
             <Popover open={openProg} onOpenChange={setOpenProg}>
               <PopoverTrigger asChild>
                 <Button type="button" variant="outline" role="combobox" className="w-full justify-between font-normal">
@@ -516,7 +516,7 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
           <Field label="Nombre del Diplomado">
             <Input value={form.plan_estudio} onChange={(e) => update("plan_estudio", e.target.value)} />
           </Field>
-          <Field label="Fecha de inicio">
+          <Field label="Fecha de Inicio">
             <Input value={form.fecha_inicio} onChange={(e) => update("fecha_inicio", e.target.value)} placeholder="Ej: 24/11/2026" />
           </Field>
           <Field label="Convocatoria">
@@ -526,11 +526,11 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
             <Input value={form.duracion} onChange={(e) => update("duracion", e.target.value)} placeholder="Ej: 17 semanas" />
           </Field>
           {fieldVisible("fecha_fin") && (
-            <Field label={fieldLabel("fecha_fin", "Fecha de finalización")}>
+            <Field label={fieldLabel("fecha_fin", "Fecha de Finalización")}>
               <Input value={form.fecha_fin} onChange={(e) => update("fecha_fin", e.target.value)} placeholder="Ej: Diciembre 2026" />
             </Field>
           )}
-          <Field label="Periodo académico *">
+          <Field label="Periodo Académico *">
             <Input required value={form.periodo} onChange={(e) => update("periodo", e.target.value)} />
           </Field>
         </div>
@@ -560,7 +560,7 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
             <Input required type="number" min={0} value={form.valor} onChange={(e) => update("valor", e.target.value)} />
           </Field>
           {isMatriculaParcial ? (
-            <Field label="Valor parcial a facturar (COP) *">
+            <Field label="Valor Parcial a Facturar (COP) *">
               <Input
                 required
                 type="number"
@@ -580,7 +580,7 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
               </Field>
             </>
           )}
-          <Field label="Valor total">
+          <Field label="Valor Total">
             <div className="flex h-9 items-center rounded-md border border-input bg-muted px-3 text-sm font-medium text-foreground">
               {formatCOP(valorTotal)}
             </div>
@@ -592,7 +592,7 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
               </p>
             )}
           </Field>
-          <Field label="Fecha límite de pago *">
+          <Field label="Fecha Límite de Pago *">
             <Input required type="date" value={form.fecha_limite_pago} onChange={(e) => update("fecha_limite_pago", e.target.value)} />
           </Field>
         </div>

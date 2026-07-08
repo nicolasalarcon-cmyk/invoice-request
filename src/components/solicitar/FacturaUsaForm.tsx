@@ -370,7 +370,7 @@ export function FacturaUsaForm({ editId, duplicateFromId }: { editId?: string; d
 
       {/* ── TIPO DE PERSONA ── */}
       <Section title="Tipo de persona">
-        <Field label="Selecciona el tipo de persona *">
+        <Field label="Selecciona el Tipo de Persona *">
           <Select value={form.tipo_persona} onValueChange={(v) => update("tipo_persona", v as TipoPersona)}>
             <SelectTrigger><SelectValue placeholder="Selecciona una opción…" /></SelectTrigger>
             <SelectContent>
@@ -389,13 +389,13 @@ export function FacturaUsaForm({ editId, duplicateFromId }: { editId?: string; d
               <Input required maxLength={300} value={form.nombre} onChange={(e) => update("nombre", e.target.value)} />
             </Field>
             <Field label="Número de Identificación *">
-              <Input required maxLength={50} value={form.cedula} onChange={(e) => update("cedula", e.target.value)} />
+              <Input required maxLength={50} type="text" inputMode="numeric" value={form.cedula} onChange={(e) => update("cedula", e.target.value.replace(/\D/g, ""))} />
             </Field>
-            <Field label="Correo electrónico">
+            <Field label="Correo Electrónico">
               <Input type="email" maxLength={200} value={form.email_natural} onChange={(e) => update("email_natural", e.target.value)} />
             </Field>
             <Field label="Teléfono">
-              <Input maxLength={50} value={form.telefono_natural} onChange={(e) => update("telefono_natural", e.target.value)} />
+              <Input maxLength={50} type="text" inputMode="numeric" value={form.telefono_natural} onChange={(e) => update("telefono_natural", e.target.value.replace(/\D/g, ""))} />
             </Field>
           </div>
         </Section>
@@ -410,9 +410,9 @@ export function FacturaUsaForm({ editId, duplicateFromId }: { editId?: string; d
                 <Input required maxLength={200} value={form.empresa} onChange={(e) => update("empresa", e.target.value)} />
               </Field>
               <Field label="Número de Identificación">
-                <Input maxLength={50} value={form.nit} onChange={(e) => update("nit", e.target.value)} />
+                <Input maxLength={50} value={form.nit} onChange={(e) => update("nit", e.target.value.replace(/[^\d-]/g, ""))} />
               </Field>
-              <Field label="Correo electrónico">
+              <Field label="Correo Electrónico">
                 <Input type="email" maxLength={200} value={form.email_empresa} onChange={(e) => update("email_empresa", e.target.value)} />
               </Field>
               <Field label="País *">
@@ -425,7 +425,7 @@ export function FacturaUsaForm({ editId, duplicateFromId }: { editId?: string; d
                 <Input required maxLength={150} value={form.ciudad} onChange={(e) => update("ciudad", e.target.value)} />
               </Field>
               <Field label="Teléfono *">
-                <Input required maxLength={50} value={form.telefono} onChange={(e) => update("telefono", e.target.value)} />
+                <Input required maxLength={50} type="text" inputMode="numeric" value={form.telefono} onChange={(e) => update("telefono", e.target.value.replace(/\D/g, ""))} />
               </Field>
               <Field label="N° de Participantes *">
                 <Input
@@ -448,7 +448,7 @@ export function FacturaUsaForm({ editId, duplicateFromId }: { editId?: string; d
                   <Input required maxLength={300} value={p.nombre} onChange={(e) => updateParticipant(i, "nombre", e.target.value)} />
                 </Field>
                 <Field label="Número de Identificación *">
-                  <Input required maxLength={50} value={p.cedula} onChange={(e) => updateParticipant(i, "cedula", e.target.value)} />
+                  <Input required maxLength={50} type="text" inputMode="numeric" value={p.cedula} onChange={(e) => updateParticipant(i, "cedula", e.target.value.replace(/\D/g, ""))} />
                 </Field>
               </div>
             </Section>
@@ -462,7 +462,7 @@ export function FacturaUsaForm({ editId, duplicateFromId }: { editId?: string; d
           {/* Programa */}
           <Section title="Datos del programa">
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Tipo de programa">
+              <Field label="Tipo de Programa">
                 {/* Restricción temporal: bloqueado en "Diplomado" hasta que se habilite Especialización. */}
                 <Select value={tipoProgramaFiltro || "__todos"} onValueChange={(v) => setTipoProgramaFiltro(v === "__todos" ? "" : v)} disabled>
                   <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
@@ -557,7 +557,7 @@ export function FacturaUsaForm({ editId, duplicateFromId }: { editId?: string; d
                   />
                 )}
               </Field>
-              <Field label="Fecha de inicio">
+              <Field label="Fecha de Inicio">
                 <Input value={form.fecha_inicio} onChange={(e) => update("fecha_inicio", e.target.value)} placeholder="Ej: 24/11/2026" />
               </Field>
             </div>

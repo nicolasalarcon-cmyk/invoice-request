@@ -110,6 +110,22 @@ interface Req {
 const isUploadFlow = (r: Req | null) =>
   r?.document_type === "factura_colombia" || r?.document_type === "factura_paypal";
 
+const formatCedula = (id: string) => {
+  const digits = (id ?? "").replace(/\D/g, "");
+  if (!digits) return id ?? "—";
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+};
+
+const buildRecuento = (r: Req) => {
+  const cohorteLine = `${(r.nemonico ?? "").trim()}${(r.cohorte ?? "").trim()} ${r.programa ?? ""}`.trim();
+  const participantesList = r.participantes && r.participantes.length > 0
+    ? r.participantes
+    : [{ nombre: r.nombre, cedula: r.identificacion, email: "", telefono: "" }];
+  return participantesList
+    .map((p) => `${cohorteLine}\nParticipante ${p.nombre} ${formatCedula(p.cedula)}`)
+    .join("\n\n");
+};
+
 const DOC_TYPE_LABELS: Record<string, string> = {
   orden_matricula: "Orden de Matrícula",
   factura_usa: "Factura USA",
@@ -1073,6 +1089,28 @@ export default function AdminPanel() {
                       <div className="max-h-[62vh] overflow-y-auto p-5 space-y-5">
                         {detailTab === "general" && (
                           <>
+                            {previewing.document_type === "factura_colombia" && (
+                              <DetailSection title="Recuento" noGrid>
+                                <div className="space-y-2">
+                                  <pre className="whitespace-pre-wrap rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm font-medium text-foreground">
+                                    {buildRecuento(previewing)}
+                                  </pre>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="rounded-full"
+                                    onClick={async () => {
+                                      await navigator.clipboard.writeText(buildRecuento(previewing));
+                                      toast.success("Recuento copiado");
+                                    }}
+                                  >
+                                    <Copy className="mr-1.5 h-3.5 w-3.5" /> Copiar recuento
+                                  </Button>
+                                </div>
+                              </DetailSection>
+                            )}
+
                             <DetailSection title={isPersonaFlow ? "Datos del tercero" : "Datos del estudiante"}>
                               {isPersonaFlow && (
                                 <div className="sm:col-span-2">

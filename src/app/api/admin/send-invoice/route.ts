@@ -10,7 +10,7 @@ async function getAdminUser(request: NextRequest) {
     .from("user_roles")
     .select("role")
     .eq("user_id", user.id)
-    .in("role", ["super_admin", "admin"])
+    .in("role", ["super_admin", "admin", "financiera"])
     .maybeSingle();
   if (!data) return null;
   return user;

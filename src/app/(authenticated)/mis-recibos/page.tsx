@@ -15,7 +15,7 @@ import {
   Receipt, Globe, Landmark, Wallet, User, GraduationCap, DollarSign, Paperclip,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { DetailSection, PreviewRow, StatusBadge } from "@/components/solicitudes/detail-panel";
+import { DetailSection, PreviewRow } from "@/components/solicitudes/detail-panel";
 import { cn } from "@/lib/utils";
 
 type Status = "pendiente" | "aprobada" | "rechazada" | "corregida";
@@ -37,6 +37,22 @@ const DOC_TYPE_ICONS: Record<string, typeof Receipt> = {
   factura_usa: Globe,
   factura_colombia: Landmark,
   factura_paypal: Wallet,
+};
+
+const formatCedula = (id: string) => {
+  const digits = (id ?? "").replace(/\D/g, "");
+  if (!digits) return id ?? "—";
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+};
+
+const buildRecuento = (r: Req) => {
+  const cohorteLine = `${(r.nemonico ?? "").trim()}${(r.cohorte ?? "").trim()} ${r.programa ?? ""}`.trim();
+  const participantesList = r.participantes && r.participantes.length > 0
+    ? r.participantes
+    : [{ nombre: r.nombre, cedula: r.identificacion, email: "", telefono: "" }];
+  return participantesList
+    .map((p) => `${cohorteLine}\nParticipante ${p.nombre} ${formatCedula(p.cedula)}`)
+    .join("\n\n");
 };
 
 const STATUS_PILL: Record<Status, string> = {
@@ -305,7 +321,7 @@ export default function MisRecibos() {
   };
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-8">
+    <main className="mx-auto max-w-7xl px-6 py-4">
       {!previewing && (
       <>
       <div className="flex flex-wrap items-center justify-end gap-2">
@@ -394,13 +410,12 @@ export default function MisRecibos() {
       </>
       )}
 
-      {/* Vista de detalle (ocupa toda la página, seccionada como un correo abierto) */}
+      {/* Vista de detalle (ocupa toda la página, seccionada como un correo abierto — misma estructura que la Bandeja) */}
       {previewing && (() => {
             const isPersonaFlow = previewing.document_type !== "orden_matricula";
             const isJuridica = previewing.tipo_persona === "Persona Jurídica";
             const participantes = previewing.participantes ?? [];
             const hasAttachments = (previewing.attachments && previewing.attachments.length > 0) || previewing.approved_pdf_path;
-            const iniciales = previewing.nombre.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
             const TABS: { id: typeof detailTab; label: string; icon: typeof User }[] = [
               { id: "general", label: "General", icon: User },
               { id: "academico", label: "Académico", icon: GraduationCap },
@@ -408,75 +423,9 @@ export default function MisRecibos() {
               { id: "adjuntos", label: "Adjuntos", icon: Paperclip },
             ];
             return (
-              <div className="space-y-4 pb-6">
-                <button
-                  type="button"
-                  onClick={() => setPreviewing(null)}
-                  className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
-                >
-                  <ArrowLeft className="h-4 w-4" /> Volver a mis recibos
-                </button>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-xl font-bold text-foreground">{previewing.nombre}</h1>
-                  <StatusBadge s={previewing.status} />
-                  {previewing.recibo_numero && (
-                    <span className="text-xs font-mono text-muted-foreground">#{previewing.recibo_numero}</span>
-                  )}
-                  <span className="text-xs text-muted-foreground">· {DOC_TYPE_LABELS[previewing.document_type ?? ""] ?? previewing.document_type ?? "—"}</span>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                  {/* Columna izquierda: resumen rápido */}
-                  <div className="space-y-4 lg:col-span-1">
-                    <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm">
-                      <div className="absolute left-0 top-0 h-1.5 w-full bg-primary" />
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-lg font-bold text-primary">
-                          {iniciales || "—"}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="truncate font-bold text-foreground">{previewing.nombre}</p>
-                          <p className="text-xs text-muted-foreground">ID {previewing.identificacion}</p>
-                        </div>
-                      </div>
-                      <div className="mt-4 space-y-2 border-t border-border pt-4 text-sm">
-                        <div className="flex justify-between gap-2">
-                          <span className="text-muted-foreground">Tipo de solicitud</span>
-                          <span className="text-right font-semibold text-foreground">{DOC_TYPE_LABELS[previewing.document_type ?? ""] ?? "—"}</span>
-                        </div>
-                        <div className="flex justify-between gap-2">
-                          <span className="text-muted-foreground">Concepto</span>
-                          <span className="text-right font-semibold text-foreground">{previewing.concepto ?? "Matrícula"}</span>
-                        </div>
-                        <div className="flex justify-between gap-2">
-                          <span className="text-muted-foreground">Asesor Comercial</span>
-                          <span className="text-right font-semibold text-foreground">{previewing.asesor_nombre ?? "—"}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="relative overflow-hidden rounded-2xl bg-slate-900 p-5 text-white shadow-md">
-                      <div className="pointer-events-none absolute -bottom-10 -right-10 h-32 w-32 rounded-full bg-white/5" />
-                      <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400">💰 Monto de solicitud</h4>
-                      <p className="text-2xl font-extrabold tracking-tight">{formatCOP(previewing.valor_total_empresa ?? previewing.valor_total)}</p>
-                      <div className="mt-4 space-y-2 border-t border-white/10 pt-4 text-xs">
-                        <div className="flex justify-between">
-                          <span className="text-slate-300">Descuento aplicado</span>
-                          <span className="font-bold text-emerald-400">
-                            {previewing.valor_parcial != null ? "—" : `${previewing.descuento_pct}% · ${formatCOP(previewing.descuento_bono ?? 0)}`}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-300">Recargo por mora</span>
-                          <span className="font-bold text-rose-400">{formatCOP(previewing.recargo_total)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Columna derecha: contenido seccionado por pestañas */}
-                  <div className="lg:col-span-2">
+              <div className="space-y-3 pb-4">
+                <div>
+                  <div>
                     <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
                       <div className="flex gap-1 border-b border-border bg-muted/30 p-1">
                         {TABS.map((t) => {
@@ -488,7 +437,7 @@ export default function MisRecibos() {
                               type="button"
                               onClick={() => setDetailTab(t.id)}
                               className={cn(
-                                "flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-semibold transition-all",
+                                "flex flex-1 items-center justify-center gap-1.5 rounded-xl py-1.5 text-xs font-semibold transition-all",
                                 active ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground",
                               )}
                             >
@@ -498,9 +447,31 @@ export default function MisRecibos() {
                         })}
                       </div>
 
-                      <div className="p-6 space-y-6">
+                      <div className="max-h-[62vh] overflow-y-auto p-5 space-y-5">
                         {detailTab === "general" && (
                           <>
+                            {previewing.document_type === "factura_colombia" && (
+                              <DetailSection title="Recuento" noGrid>
+                                <div className="space-y-2">
+                                  <pre className="whitespace-pre-wrap rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm font-medium text-foreground">
+                                    {buildRecuento(previewing)}
+                                  </pre>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="rounded-full"
+                                    onClick={async () => {
+                                      await navigator.clipboard.writeText(buildRecuento(previewing));
+                                      toast.success("Recuento copiado");
+                                    }}
+                                  >
+                                    <Copy className="mr-1.5 h-3.5 w-3.5" /> Copiar recuento
+                                  </Button>
+                                </div>
+                              </DetailSection>
+                            )}
+
                             <DetailSection title={isPersonaFlow ? "Datos del tercero" : "Datos del estudiante"}>
                               {isPersonaFlow && (
                                 <div className="sm:col-span-2">
@@ -544,6 +515,9 @@ export default function MisRecibos() {
                             )}
 
                             <DetailSection title="Estado y seguimiento">
+                              <PreviewRow label="Líder Comercial" value={previewing.comercial_nombre ?? "—"} />
+                              <PreviewRow label="Correo Líder Comercial" value={previewing.comercial_email ?? "—"} />
+                              <PreviewRow label="Asesor Comercial" value={previewing.asesor_nombre ?? "—"} />
                               <PreviewRow label="Creada" value={formatDate(previewing.created_at)} />
                               {previewing.approved_at && <PreviewRow label="Aprobada" value={formatDate(previewing.approved_at)} />}
                               {previewing.observaciones && (
@@ -638,58 +612,68 @@ export default function MisRecibos() {
                   </div>
                 </div>
 
-                {/* Barra de acciones, fija al fondo de la pantalla */}
-                <div className="sticky bottom-0 left-0 right-0 -mx-6 border-t border-border bg-card/95 px-6 py-4 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] backdrop-blur">
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap gap-2">
-                      {previewing.status === "pendiente" && (
-                        <Link href={`/solicitar?id=${previewing.id}`} className="flex-1">
-                          <Button className="w-full rounded-xl"><Pencil className="mr-2 h-4 w-4" /> Editar</Button>
-                        </Link>
-                      )}
-                      {previewing.status === "rechazada" && (
-                        <Link href={`/solicitar?id=${previewing.id}`} className="flex-1">
-                          <Button className="w-full rounded-xl"><Pencil className="mr-2 h-4 w-4" /> Corregir y reenviar</Button>
-                        </Link>
-                      )}
-                    </div>
-                    {(previewing.status === "aprobada" || previewing.status === "corregida") && (
-                      <div className="flex flex-wrap gap-2">
-                        {previewing.document_type === "factura_paypal" && !previewing.approved_pdf_path ? (
-                          <Button size="sm" variant="outline" className="rounded-xl" onClick={() => openResponseView(previewing)}>
-                            <Eye className="mr-2 h-4 w-4" /> Ver Respuesta
-                          </Button>
-                        ) : (
-                          <>
-                            <Button size="sm" variant="outline" className="rounded-xl" onClick={() => previewPdf(previewing)}>
-                              <Eye className="mr-2 h-4 w-4" /> Vista previa
-                            </Button>
-                            <Button size="sm" variant="outline" className="rounded-xl" onClick={() => downloadPdf(previewing)}>
-                              <FileDown className="mr-2 h-4 w-4" /> Descargar PDF
-                            </Button>
-                          </>
-                        )}
-                        {withinCorrectionWindow(previewing.approved_at) ? (
-                          <Link href={`/solicitar?id=${previewing.id}`}>
-                            <Button size="sm" variant="outline" className="rounded-xl">
-                              <Wrench className="mr-2 h-4 w-4" /> Corregir
-                            </Button>
-                          </Link>
-                        ) : (
-                          <Button size="sm" variant="outline" className="rounded-xl" disabled title="Ya pasaron más de 3 días desde la aprobación — no se puede corregir.">
-                            <Wrench className="mr-2 h-4 w-4" /> Corregir
-                          </Button>
-                        )}
-                        <Button size="sm" variant="outline" className="rounded-xl" onClick={() => duplicar(previewing)}>
-                          <Copy className="mr-2 h-4 w-4" /> Duplicar
+                {/* Barra de acciones, fija al fondo de la pantalla — misma estructura que la Bandeja */}
+                <div className="sticky bottom-0 left-0 right-0 -mx-6 border-t border-border bg-card/95 px-6 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] backdrop-blur">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button size="sm" variant="ghost" className="rounded-full" onClick={() => setPreviewing(null)}>
+                      <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Mis recibos
+                    </Button>
+                    {previewing.status === "pendiente" && (
+                      <Link href={`/solicitar?id=${previewing.id}`}>
+                        <Button size="sm" variant="outline" className="rounded-full">
+                          <Pencil className="mr-1.5 h-3.5 w-3.5" /> Editar
                         </Button>
-                      </div>
+                      </Link>
                     )}
-                    {(previewing.status === "aprobada" || previewing.status === "corregida" || previewing.status === "rechazada") && (
-                      <Button size="sm" variant="destructive" className="w-full rounded-xl" onClick={() => archiveRequest(previewing)}>
-                        <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                    {previewing.status === "rechazada" && (
+                      <Link href={`/solicitar?id=${previewing.id}`}>
+                        <Button size="sm" variant="outline" className="rounded-full">
+                          <Pencil className="mr-1.5 h-3.5 w-3.5" /> Corregir y reenviar
+                        </Button>
+                      </Link>
+                    )}
+                    {(previewing.status === "aprobada" || previewing.status === "corregida") && (
+                      previewing.document_type === "factura_paypal" && !previewing.approved_pdf_path ? (
+                        <Button size="sm" variant="outline" className="rounded-full" onClick={() => openResponseView(previewing)}>
+                          <Eye className="mr-1.5 h-3.5 w-3.5" /> Ver Respuesta
+                        </Button>
+                      ) : (
+                        <>
+                          <Button size="sm" variant="outline" className="rounded-full" onClick={() => previewPdf(previewing)}>
+                            <Eye className="mr-1.5 h-3.5 w-3.5" /> Vista previa
+                          </Button>
+                          <Button size="sm" variant="outline" className="rounded-full" onClick={() => downloadPdf(previewing)}>
+                            <FileDown className="mr-1.5 h-3.5 w-3.5" /> Descargar PDF
+                          </Button>
+                        </>
+                      )
+                    )}
+                    {(previewing.status === "aprobada" || previewing.status === "corregida") && (
+                      withinCorrectionWindow(previewing.approved_at) ? (
+                        <Link href={`/solicitar?id=${previewing.id}`}>
+                          <Button size="sm" variant="outline" className="rounded-full">
+                            <Wrench className="mr-1.5 h-3.5 w-3.5" /> Corregir
+                          </Button>
+                        </Link>
+                      ) : (
+                        <Button size="sm" variant="outline" className="rounded-full" disabled title="Ya pasaron más de 3 días desde la aprobación — no se puede corregir.">
+                          <Wrench className="mr-1.5 h-3.5 w-3.5" /> Corregir
+                        </Button>
+                      )
+                    )}
+                    {(previewing.status === "aprobada" || previewing.status === "corregida") && (
+                      <Button size="sm" variant="outline" className="rounded-full" onClick={() => duplicar(previewing)}>
+                        <Copy className="mr-1.5 h-3.5 w-3.5" /> Duplicar
                       </Button>
                     )}
+
+                    <div className="ml-auto flex items-center gap-2">
+                      {(previewing.status === "aprobada" || previewing.status === "corregida" || previewing.status === "rechazada") && (
+                        <Button size="sm" variant="outline" className="rounded-full text-red-700 border-red-200 hover:bg-red-700 hover:text-white" onClick={() => archiveRequest(previewing)}>
+                          <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Eliminar
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

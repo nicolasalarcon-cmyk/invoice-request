@@ -342,7 +342,7 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
       {/* Restricción temporal: Factura PayPal solo admite Persona Natural por ahora.
           Quitar el "disabled" reactiva Persona Jurídica cuando se habilite. */}
       <Section title="Tipo de persona">
-        <Field label="Selecciona el tipo de persona *">
+        <Field label="Selecciona el Tipo de Persona *">
           <Select value={form.tipo_persona} onValueChange={(v) => update("tipo_persona", v as TipoPersona)} disabled>
             <SelectTrigger><SelectValue placeholder="Selecciona una opción…" /></SelectTrigger>
             <SelectContent>
@@ -361,13 +361,13 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
               <Input required maxLength={300} value={form.nombre} onChange={(e) => update("nombre", e.target.value)} />
             </Field>
             <Field label="Número de Identificación *">
-              <Input required maxLength={50} value={form.cedula} onChange={(e) => update("cedula", e.target.value)} />
+              <Input required maxLength={50} type="text" inputMode="numeric" value={form.cedula} onChange={(e) => update("cedula", e.target.value.replace(/\D/g, ""))} />
             </Field>
-            <Field label="Correo electrónico">
+            <Field label="Correo Electrónico">
               <Input type="email" maxLength={200} value={form.email_natural} onChange={(e) => update("email_natural", e.target.value)} />
             </Field>
             <Field label="Teléfono">
-              <Input maxLength={50} value={form.telefono_natural} onChange={(e) => update("telefono_natural", e.target.value)} />
+              <Input maxLength={50} type="text" inputMode="numeric" value={form.telefono_natural} onChange={(e) => update("telefono_natural", e.target.value.replace(/\D/g, ""))} />
             </Field>
           </div>
         </Section>
@@ -382,9 +382,9 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
                 <Input required maxLength={200} value={form.empresa} onChange={(e) => update("empresa", e.target.value)} />
               </Field>
               <Field label="Número de Identificación">
-                <Input maxLength={50} value={form.nit} onChange={(e) => update("nit", e.target.value)} />
+                <Input maxLength={50} value={form.nit} onChange={(e) => update("nit", e.target.value.replace(/[^\d-]/g, ""))} />
               </Field>
-              <Field label="Correo electrónico">
+              <Field label="Correo Electrónico">
                 <Input type="email" maxLength={200} value={form.email_empresa} onChange={(e) => update("email_empresa", e.target.value)} />
               </Field>
               <Field label="País *">
@@ -397,7 +397,7 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
                 <Input required maxLength={150} value={form.ciudad} onChange={(e) => update("ciudad", e.target.value)} />
               </Field>
               <Field label="Teléfono *">
-                <Input required maxLength={50} value={form.telefono} onChange={(e) => update("telefono", e.target.value)} />
+                <Input required maxLength={50} type="text" inputMode="numeric" value={form.telefono} onChange={(e) => update("telefono", e.target.value.replace(/\D/g, ""))} />
               </Field>
               <Field label="N° de Participantes *">
                 <Input
@@ -420,7 +420,7 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
                   <Input required maxLength={300} value={p.nombre} onChange={(e) => updateParticipant(i, "nombre", e.target.value)} />
                 </Field>
                 <Field label="Número de Identificación *">
-                  <Input required maxLength={50} value={p.cedula} onChange={(e) => updateParticipant(i, "cedula", e.target.value)} />
+                  <Input required maxLength={50} type="text" inputMode="numeric" value={p.cedula} onChange={(e) => updateParticipant(i, "cedula", e.target.value.replace(/\D/g, ""))} />
                 </Field>
               </div>
             </Section>
