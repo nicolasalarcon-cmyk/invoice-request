@@ -7,7 +7,6 @@ import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -485,6 +484,7 @@ export default function AdminPanel() {
     const limite = r.fecha_limite_pago ?? new Date(today.getTime() + (tpl?.dias_limite ?? 4) * 86400000).toISOString().slice(0, 10);
     const extra = new Date(new Date(limite).getTime() + (tpl?.dias_extraordinario ?? 7) * 86400000).toISOString().slice(0, 10);
 
+    const notesText = approvalNotes.trim();
     const { error } = await supabase
       .from("invoice_requests")
       .update({
@@ -495,6 +495,7 @@ export default function AdminPanel() {
         fecha_limite_pago: limite,
         fecha_pago_extraordinario: extra,
         template_id: selectedTemplate || null,
+        ...(notesText ? { observaciones: [r.observaciones, `📎 Nota de aprobación: ${notesText}`].filter(Boolean).join("\n\n") } : {}),
       })
       .eq("id", r.id);
     if (error) return toast.error(error.message);
@@ -522,6 +523,7 @@ export default function AdminPanel() {
     }
 
     setApproving(null);
+    setApprovalNotes("");
     setPreviewing((p) => p?.id === r.id ? null : p);
     load();
   };
@@ -976,23 +978,20 @@ export default function AdminPanel() {
           })() : (
             <>
               <p className="text-sm text-muted-foreground">
-                Elige la plantilla con la que se generará el PDF para <strong>{approving?.nombre}</strong>.
+                Se generará el PDF para <strong>{approving?.nombre}</strong>.
               </p>
-              <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
-                <SelectTrigger><SelectValue placeholder="Plantilla" /></SelectTrigger>
-                <SelectContent>
-                  {templates
-                    .filter((t) => getTemplateDocType(t) === approving?.document_type)
-                    .map((t) => (
-                      <SelectItem key={t.id} value={t.id!}>
-                        {t.nombre}{t.is_default && (t.default_for ? ` · default ${t.default_for}` : " · default")}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Nota de aprobación (opcional)</label>
+                <Textarea
+                  rows={3}
+                  value={approvalNotes}
+                  onChange={(e) => setApprovalNotes(e.target.value)}
+                  placeholder="Deja aquí una nota opcional sobre esta aprobación…"
+                />
+              </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setApproving(null)}>Cancelar</Button>
-                <Button onClick={confirmApprove} disabled={!selectedTemplate}>Aprobar</Button>
+                <Button onClick={confirmApprove}>Aprobar</Button>
               </DialogFooter>
             </>
           )}

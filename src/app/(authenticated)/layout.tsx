@@ -9,7 +9,7 @@ import { usePendingCount } from "@/lib/use-pending-count";
 import { useIdleLogout } from "@/lib/use-idle-logout";
 import {
   LogOut, LayoutDashboard, ClipboardList,
-  FilePlus, Users, LayoutTemplate, Hash, BookOpen,
+  FilePlus, Users, Hash, BookOpen,
 } from "lucide-react";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -83,7 +83,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
   const {
     user, role, profile, loading,
     isAdmin, canViewDashboard, canViewNumeracion,
-    canManageTemplates, canManagePrograms, canManageUsers,
+    canManagePrograms, canManageUsers,
     canViewAllRequests,
   } = useAuth();
   const router = useRouter();
@@ -107,7 +107,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
 
   const badgeCount = pendingCount > 0 ? (pendingCount > 99 ? "99+" : String(pendingCount)) : undefined;
 
-  const hasConfigTabs = canViewNumeracion || canManagePrograms || canManageTemplates || canManageUsers;
+  const hasConfigTabs = canViewNumeracion || canManagePrograms || canManageUsers;
 
   return (
     <div className="min-h-screen bg-background">
@@ -172,9 +172,6 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
             )}
             {canManagePrograms && (
               <NavTab href="/admin/asesores" icon={<Users className="h-3.5 w-3.5" />} label="Asesores" small />
-            )}
-            {canManageTemplates && (
-              <NavTab href="/admin/plantillas" icon={<LayoutTemplate className="h-3.5 w-3.5" />} label="Plantillas" small />
             )}
             {canManageUsers && (
               <NavTab href="/admin/usuarios" icon={<Users className="h-3.5 w-3.5" />} label="Usuarios" small />
