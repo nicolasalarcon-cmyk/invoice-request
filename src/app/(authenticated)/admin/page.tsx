@@ -132,6 +132,14 @@ const DOC_TYPE_LABELS: Record<string, string> = {
   factura_paypal: "Factura PayPal",
 };
 
+const CREATOR_ROLE_LABELS: Record<string, string> = {
+  super_admin: "Super Administrador",
+  admin: "Administrador",
+  financiera: "Financiera",
+  cartera: "Cartera",
+  comercial: "Líder Comercial",
+};
+
 const STATUS_PILL: Record<Status, string> = {
   pendiente: "bg-amber-50 text-amber-700",
   aprobada: "bg-emerald-50 text-emerald-700",
@@ -1156,8 +1164,8 @@ export default function AdminPanel() {
                             )}
 
                             <DetailSection title="Estado y seguimiento">
-                              <PreviewRow label="Líder Comercial" value={previewing.comercial_nombre ?? "—"} />
-                              <PreviewRow label="Correo Líder Comercial" value={previewing.comercial_email ?? "—"} />
+                              <PreviewRow label={CREATOR_ROLE_LABELS[previewing.created_by_role ?? ""] ?? "Líder Comercial"} value={previewing.comercial_nombre ?? "—"} />
+                              <PreviewRow label={`Correo ${CREATOR_ROLE_LABELS[previewing.created_by_role ?? ""] ?? "Líder Comercial"}`} value={previewing.comercial_email ?? "—"} />
                               <PreviewRow label="Asesor Comercial" value={previewing.asesor_nombre ?? "—"} />
                               <PreviewRow label="Creada" value={formatDate(previewing.created_at)} />
                               {previewing.approved_at && <PreviewRow label="Aprobada" value={formatDate(previewing.approved_at)} />}

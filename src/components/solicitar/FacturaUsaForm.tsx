@@ -25,6 +25,14 @@ import type { Json } from "@/integrations/supabase/types";
 
 type TipoPersona = "" | "Persona Natural" | "Persona Jurídica";
 
+const SECTION_TITLE_BY_ROLE: Record<string, string> = {
+  super_admin: "Datos de Super Administrador",
+  admin: "Datos de Administrador",
+  financiera: "Datos de Financiera",
+  cartera: "Datos de Cartera",
+  comercial: "Datos del Líder Comercial",
+};
+
 interface Participant {
   nombre: string;
   cedula: string;
@@ -337,7 +345,7 @@ export function FacturaUsaForm({ editId, duplicateFromId }: { editId?: string; d
     <form onSubmit={handleSubmit} className="space-y-6">
 
       {/* ── COMERCIAL ── */}
-      <Section title={role === "cartera" ? "Datos de Cartera" : "Datos del Líder Comercial"}>
+      <Section title={SECTION_TITLE_BY_ROLE[role ?? ""] ?? "Datos del Líder Comercial"}>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Nombre Completo">
             <Input value={profile?.nombre_completo ?? ""} disabled />
