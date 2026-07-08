@@ -215,6 +215,11 @@ export default function MisRecibos() {
         setPreviewUrl(data.signedUrl);
         return;
       }
+      if (r.document_type === "factura_colombia" || r.document_type === "factura_paypal") {
+        toast.error("Esta solicitud no tiene un PDF adjunto.");
+        setPreviewOpen(false);
+        return;
+      }
       const { getInvoicePdfDataUrl } = await import("@/lib/generate-invoice-pdf");
       const url = await getInvoicePdfDataUrl(reqToPdfData(r));
       setPreviewUrl(url);
@@ -235,8 +240,34 @@ export default function MisRecibos() {
       window.open(data.signedUrl, "_blank");
       return;
     }
+    if (r.document_type === "factura_colombia" || r.document_type === "factura_paypal") {
+      toast.error("Esta solicitud no tiene un PDF adjunto.");
+      return;
+    }
     const { generateInvoicePDF } = await import("@/lib/generate-invoice-pdf");
     await generateInvoicePDF(reqToPdfData(r));
+  };
+
+  const [responseViewOpen, setResponseViewOpen] = useState(false);
+  const [responseLoading, setResponseLoading] = useState(false);
+  const [responseNotesText, setResponseNotesText] = useState("");
+  const [responseImages, setResponseImages] = useState<{ name: string; url: string }[]>([]);
+
+  const openResponseView = async (r: Req) => {
+    setResponseViewOpen(true);
+    setResponseLoading(true);
+    setResponseNotesText(r.observaciones ?? "");
+    setResponseImages([]);
+    try {
+      const noteAttachments = (r.attachments ?? []).filter((a) => a.name.startsWith("Nota de aprobación"));
+      const signed = await Promise.all(noteAttachments.map(async (a) => {
+        const { data } = await supabase.storage.from("invoice-files").createSignedUrl(a.path, 300);
+        return { name: a.name, url: data?.signedUrl ?? "" };
+      }));
+      setResponseImages(signed.filter((s) => s.url));
+    } finally {
+      setResponseLoading(false);
+    }
   };
 
   const openAttachment = async (path: string) => {
@@ -624,12 +655,20 @@ export default function MisRecibos() {
                     </div>
                     {(previewing.status === "aprobada" || previewing.status === "corregida") && (
                       <div className="flex flex-wrap gap-2">
-                        <Button size="sm" variant="outline" className="rounded-xl" onClick={() => previewPdf(previewing)}>
-                          <Eye className="mr-2 h-4 w-4" /> Vista previa
-                        </Button>
-                        <Button size="sm" variant="outline" className="rounded-xl" onClick={() => downloadPdf(previewing)}>
-                          <FileDown className="mr-2 h-4 w-4" /> Descargar PDF
-                        </Button>
+                        {previewing.document_type === "factura_paypal" && !previewing.approved_pdf_path ? (
+                          <Button size="sm" variant="outline" className="rounded-xl" onClick={() => openResponseView(previewing)}>
+                            <Eye className="mr-2 h-4 w-4" /> Ver Respuesta
+                          </Button>
+                        ) : (
+                          <>
+                            <Button size="sm" variant="outline" className="rounded-xl" onClick={() => previewPdf(previewing)}>
+                              <Eye className="mr-2 h-4 w-4" /> Vista previa
+                            </Button>
+                            <Button size="sm" variant="outline" className="rounded-xl" onClick={() => downloadPdf(previewing)}>
+                              <FileDown className="mr-2 h-4 w-4" /> Descargar PDF
+                            </Button>
+                          </>
+                        )}
                         {withinCorrectionWindow(previewing.approved_at) ? (
                           <Link href={`/solicitar?id=${previewing.id}`}>
                             <Button size="sm" variant="outline" className="rounded-xl">
@@ -656,6 +695,36 @@ export default function MisRecibos() {
               </div>
             );
           })()}
+
+      <Dialog open={responseViewOpen} onOpenChange={setResponseViewOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-4 w-4" /> Respuesta de aprobación
+            </DialogTitle>
+          </DialogHeader>
+          {responseLoading ? (
+            <p className="text-sm text-muted-foreground">Cargando…</p>
+          ) : (
+            <div className="space-y-4">
+              {responseNotesText ? (
+                <p className="whitespace-pre-wrap text-sm text-foreground">{responseNotesText}</p>
+              ) : (
+                <p className="text-sm text-muted-foreground">Sin nota de aprobación registrada.</p>
+              )}
+              {responseImages.length > 0 && (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {responseImages.map((img) => (
+                    <a key={img.url} href={img.url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-border">
+                      <img src={img.url} alt={img.name} className="h-32 w-full object-cover" />
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-w-4xl">

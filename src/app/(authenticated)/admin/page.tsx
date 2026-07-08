@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ClipboardEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -156,6 +156,8 @@ export default function AdminPanel() {
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
   const [approvalPdf, setApprovalPdf] = useState<File | null>(null);
   const [manualReciboNumero, setManualReciboNumero] = useState<string>("");
+  const [approvalNotes, setApprovalNotes] = useState("");
+  const [approvalImages, setApprovalImages] = useState<{ file: File; previewUrl: string }[]>([]);
   const [rejecting, setRejecting] = useState<Req | null>(null);
   const [rejectCategory, setRejectCategory] = useState("");
   const [rejectOtherText, setRejectOtherText] = useState("");
@@ -165,6 +167,10 @@ export default function AdminPanel() {
   const [pdfPreviewName, setPdfPreviewName] = useState("");
   const [pdfPreviewLoading, setPdfPreviewLoading] = useState(false);
   const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
+  const [responseViewOpen, setResponseViewOpen] = useState(false);
+  const [responseLoading, setResponseLoading] = useState(false);
+  const [responseNotesText, setResponseNotesText] = useState("");
+  const [responseImages, setResponseImages] = useState<{ name: string; url: string }[]>([]);
 
   const load = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -280,6 +286,9 @@ export default function AdminPanel() {
   const openApprove = (r: Req) => {
     setApproving(r);
     setApprovalPdf(null);
+    setApprovalNotes("");
+    approvalImages.forEach((img) => URL.revokeObjectURL(img.previewUrl));
+    setApprovalImages([]);
     if (isUploadFlow(r)) {
       setManualReciboNumero(r.recibo_numero != null ? String(r.recibo_numero) : "");
       setSelectedTemplate("");
@@ -292,6 +301,27 @@ export default function AdminPanel() {
       (r.template_id && docTemplates.some((t) => t.id === r.template_id) ? r.template_id : null)
       ?? matchTipo?.id ?? matchAny?.id ?? docTemplates[0]?.id ?? "",
     );
+  };
+
+  const handleNotesPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = Array.from(e.clipboardData.items)
+      .filter((item) => item.type.startsWith("image/"))
+      .map((item) => item.getAsFile())
+      .filter((f): f is File => !!f);
+    if (files.length === 0) return;
+    e.preventDefault();
+    setApprovalImages((prev) => [
+      ...prev,
+      ...files.map((file) => ({ file, previewUrl: URL.createObjectURL(file) })),
+    ]);
+  };
+
+  const removeApprovalImage = (index: number) => {
+    setApprovalImages((prev) => {
+      const target = prev[index];
+      if (target) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
   const openRejectDialog = (r: Req) => {
@@ -366,7 +396,29 @@ export default function AdminPanel() {
         });
         pdfBase64 = dataUrl.split(",")[1];
       }
-      const reciboNumero = manualReciboNumero.trim();
+      const uploadedNoteImages: AttachmentItem[] = [];
+      for (let i = 0; i < approvalImages.length; i++) {
+        const { file } = approvalImages[i];
+        const ext = file.name.includes(".") ? file.name.split(".").pop() : (file.type.split("/")[1] || "png");
+        const path = `approved/${r.id}-nota-${i}.${ext}`;
+        const { error: imgErr } = await supabase.storage
+          .from("invoice-files")
+          .upload(path, file, { contentType: file.type || "image/png", upsert: true });
+        if (imgErr) throw imgErr;
+        uploadedNoteImages.push({ path, name: `Nota de aprobación — imagen ${i + 1}.${ext}`, size: file.size, type: file.type });
+      }
+      const notesText = approvalNotes.trim();
+      let reciboNumero = manualReciboNumero.trim();
+      if (!reciboNumero && r.document_type === "factura_paypal") {
+        const { count, error: countError } = await supabase
+          .from("invoice_requests")
+          .select("id", { count: "exact", head: true })
+          .eq("document_type", "factura_paypal")
+          .not("recibo_numero", "is", null)
+          .neq("recibo_numero", "");
+        if (countError) throw countError;
+        reciboNumero = String((count ?? 0) + 1);
+      }
       const user = (await supabase.auth.getUser()).data.user;
       const { error } = await supabase
         .from("invoice_requests")
@@ -376,6 +428,8 @@ export default function AdminPanel() {
           approved_at: new Date().toISOString(),
           recibo_numero: reciboNumero,
           ...(pdfPath ? { approved_pdf_path: pdfPath } : {}),
+          ...(uploadedNoteImages.length > 0 ? { attachments: [...(r.attachments ?? []), ...uploadedNoteImages] as any } : {}),
+          ...(notesText ? { observaciones: [r.observaciones, `📎 Nota de aprobación (PayPal): ${notesText}`].filter(Boolean).join("\n\n") } : {}),
         })
         .eq("id", r.id);
       if (error) throw error;
@@ -394,6 +448,9 @@ export default function AdminPanel() {
       setApproving(null);
       setApprovalPdf(null);
       setManualReciboNumero("");
+      setApprovalNotes("");
+      approvalImages.forEach((img) => URL.revokeObjectURL(img.previewUrl));
+      setApprovalImages([]);
       setPreviewing((p) => p?.id === r.id ? null : p);
       load();
     } catch (e) {
@@ -528,8 +585,29 @@ export default function AdminPanel() {
       window.open(data.signedUrl, "_blank");
       return;
     }
+    if (isUploadFlow(r)) {
+      toast.error("Esta solicitud no tiene un PDF adjunto.");
+      return;
+    }
     const { generateInvoicePDF } = await import("@/lib/generate-invoice-pdf");
     await generateInvoicePDF(reqToPdfData(r));
+  };
+
+  const openResponseView = async (r: Req) => {
+    setResponseViewOpen(true);
+    setResponseLoading(true);
+    setResponseNotesText(r.observaciones ?? "");
+    setResponseImages([]);
+    try {
+      const noteAttachments = (r.attachments ?? []).filter((a) => a.name.startsWith("Nota de aprobación"));
+      const signed = await Promise.all(noteAttachments.map(async (a) => {
+        const { data } = await supabase.storage.from("invoice-files").createSignedUrl(a.path, 300);
+        return { name: a.name, url: data?.signedUrl ?? "" };
+      }));
+      setResponseImages(signed.filter((s) => s.url));
+    } finally {
+      setResponseLoading(false);
+    }
   };
 
   const openAttachment = async (path: string) => {
@@ -795,14 +873,17 @@ export default function AdminPanel() {
 
       {/* Aprobar */}
       <Dialog open={!!approving} onOpenChange={(o) => !o && setApproving(null)}>
-        <DialogContent>
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Aprobar Solicitud</DialogTitle>
           </DialogHeader>
-          {isUploadFlow(approving) ? (
+          {isUploadFlow(approving) ? (() => {
+            const isPaypal = approving?.document_type === "factura_paypal";
+            return (
             <>
               <p className="text-sm text-muted-foreground">
-                Ingresa el consecutivo con el que salió la factura en la plataforma externa. Puedes adjuntar el PDF si lo tienes disponible.
+                Ingresa el consecutivo con el que salió la factura en la plataforma externa.
+                {isPaypal ? " Adjuntar el PDF es opcional." : " Puedes adjuntar el PDF si lo tienes disponible."}
               </p>
               {approving?.attachments && (approving.attachments as {path:string;name:string}[]).length > 0 && (
                 <div className="rounded border border-border bg-muted/40 p-3">
@@ -817,7 +898,7 @@ export default function AdminPanel() {
                 </div>
               )}
               <div className="space-y-1">
-                <label className="text-sm font-medium">N° Consecutivo *</label>
+                <label className="text-sm font-medium">N° Consecutivo{isPaypal ? " (opcional)" : " *"}</label>
                 <Input
                   type={approving?.document_type === "factura_colombia" ? "text" : "number"}
                   min={approving?.document_type === "factura_colombia" ? undefined : 1}
@@ -828,20 +909,55 @@ export default function AdminPanel() {
                 <p className="text-xs text-muted-foreground">
                   {approving?.document_type === "factura_colombia"
                     ? "Puede incluir letras y números. Quedará registrado en la sección Numeración."
+                    : isPaypal
+                    ? "Si lo dejas vacío, se asignará automáticamente según el conteo de Facturas PayPal ya numeradas."
                     : "Quedará registrado en la sección Numeración."}
                 </p>
               </div>
+              {isPaypal && (
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Nota de aprobación</label>
+                  <p className="text-xs text-muted-foreground">
+                    Escribe el detalle de la transacción y pega aquí capturas de pantalla (Ctrl+V) si las tienes. Opcional.
+                  </p>
+                  <textarea
+                    className="min-h-[90px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    placeholder="Ej: Pago confirmado en PayPal, ID de transacción 8LK..., pega aquí la captura de la transacción"
+                    value={approvalNotes}
+                    onChange={(e) => setApprovalNotes(e.target.value)}
+                    onPaste={handleNotesPaste}
+                  />
+                  {approvalImages.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {approvalImages.map((img, i) => (
+                        <div key={img.previewUrl} className="group relative h-16 w-16 overflow-hidden rounded-md border border-border">
+                          <img src={img.previewUrl} alt={`Imagen pegada ${i + 1}`} className="h-full w-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => removeApprovalImage(i)}
+                            className="absolute right-0.5 top-0.5 rounded-full bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                            title="Quitar imagen"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="space-y-1">
-                <label className="text-sm font-medium">Sube aquí tu factura *</label>
+                <label className="text-sm font-medium">Sube aquí tu factura{isPaypal ? " (opcional)" : " *"}</label>
                 <Input type="file" onChange={(e) => setApprovalPdf(e.target.files?.[0] ?? null)} />
                 {approvalPdf && <p className="text-xs text-muted-foreground">{approvalPdf.name} · {(approvalPdf.size / 1024).toFixed(0)} KB</p>}
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setApproving(null)}>Cancelar</Button>
-                <Button onClick={confirmApproveUpload} disabled={!manualReciboNumero.trim() || !approvalPdf}>Aprobar</Button>
+                <Button onClick={confirmApproveUpload} disabled={!isPaypal && (!manualReciboNumero.trim() || !approvalPdf)}>Aprobar</Button>
               </DialogFooter>
             </>
-          ) : (
+            );
+          })() : (
             <>
               <p className="text-sm text-muted-foreground">
                 Elige la plantilla con la que se generará el PDF para <strong>{approving?.nombre}</strong>.
@@ -1155,9 +1271,15 @@ export default function AdminPanel() {
                       </Link>
                     )}
                     {(previewing.status === "aprobada" || previewing.status === "corregida") && (
-                      <Button size="sm" variant="outline" className="rounded-full" onClick={() => downloadPdf(previewing)}>
-                        <FileDown className="mr-1.5 h-3.5 w-3.5" /> Descargar PDF
-                      </Button>
+                      previewing.document_type === "factura_paypal" && !previewing.approved_pdf_path ? (
+                        <Button size="sm" variant="outline" className="rounded-full" onClick={() => openResponseView(previewing)}>
+                          <Eye className="mr-1.5 h-3.5 w-3.5" /> Ver Respuesta
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="outline" className="rounded-full" onClick={() => downloadPdf(previewing)}>
+                          <FileDown className="mr-1.5 h-3.5 w-3.5" /> Descargar PDF
+                        </Button>
+                      )
                     )}
                     {!isCartera && (previewing.status === "aprobada" || previewing.status === "corregida") && (
                       <Button size="sm" variant="outline" className="rounded-full" onClick={() => duplicar(previewing)}>
@@ -1194,6 +1316,37 @@ export default function AdminPanel() {
               </div>
             );
           })()}
+
+      {/* Dialog: Ver Respuesta (aprobación PayPal sin PDF) */}
+      <Dialog open={responseViewOpen} onOpenChange={setResponseViewOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-4 w-4" /> Respuesta de aprobación
+            </DialogTitle>
+          </DialogHeader>
+          {responseLoading ? (
+            <p className="text-sm text-muted-foreground">Cargando…</p>
+          ) : (
+            <div className="space-y-4">
+              {responseNotesText ? (
+                <p className="whitespace-pre-wrap text-sm text-foreground">{responseNotesText}</p>
+              ) : (
+                <p className="text-sm text-muted-foreground">Sin nota de aprobación registrada.</p>
+              )}
+              {responseImages.length > 0 && (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {responseImages.map((img) => (
+                    <a key={img.url} href={img.url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-border">
+                      <img src={img.url} alt={img.name} className="h-32 w-full object-cover" />
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog: Ver PDF */}
       <Dialog open={pdfPreviewOpen} onOpenChange={(o) => { if (!o) { setPdfPreviewOpen(false); setPdfPreviewUrl(null); } }}>
