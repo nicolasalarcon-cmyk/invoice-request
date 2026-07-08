@@ -60,11 +60,7 @@ export default function ProgramasPage() {
 
   return (
     <main className="mx-auto max-w-7xl px-6 py-8">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Catálogo de programas</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Estos programas autocompletan el formulario de solicitud.</p>
-        </div>
+      <div className="flex flex-wrap items-center justify-end gap-3">
         <Button onClick={() => setEditing({ ...EMPTY })}><Plus className="mr-2 h-4 w-4" /> Nuevo programa</Button>
       </div>
 

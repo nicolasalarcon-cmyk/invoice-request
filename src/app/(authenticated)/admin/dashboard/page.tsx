@@ -186,11 +186,6 @@ export default function Dashboard() {
 
   return (
     <main className="mx-auto max-w-7xl px-6 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard</h1>
-        <p className="mt-1 text-base text-muted-foreground">Estadísticas y métricas de solicitudes.</p>
-      </div>
-
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard label="Total" value={totales.total}       icon={<FileText className="h-5 w-5" />}       accent="#6366F1" bg="#EEF2FF" />
         <StatCard label="Pendientes" value={totales.pendientes} icon={<Clock className="h-5 w-5" />}        accent="#F59E0B" bg="#FEF3C7" />

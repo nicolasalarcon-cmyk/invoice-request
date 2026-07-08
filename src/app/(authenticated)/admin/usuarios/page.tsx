@@ -144,11 +144,7 @@ export default function UsersPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-8">
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Usuarios</h1>
-          <p className="mt-1 text-sm text-muted-foreground">El admin crea cuentas, asigna roles y cambia contraseñas.</p>
-        </div>
+      <div className="flex items-center justify-end gap-3">
         <Button onClick={() => setCreating(true)}><UserPlus className="mr-2 h-4 w-4" /> Nuevo usuario</Button>
       </div>
 
