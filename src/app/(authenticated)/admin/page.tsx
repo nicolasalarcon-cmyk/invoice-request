@@ -50,6 +50,7 @@ interface Req {
   document_type: DocType | null;
   nombre: string;
   identificacion: string;
+  numero_inscripcion: string | null;
   email: string | null;
   telefono: string | null;
   tipo_persona: string | null;
@@ -1168,16 +1169,29 @@ export default function AdminPanel() {
                                   <PreviewRow label="País" value={previewing.pais ?? "—"} />
                                   <PreviewRow label="Ciudad" value={previewing.ciudad ?? "—"} />
                                   <div className="sm:col-span-2"><PreviewRow label="Dirección" value={previewing.direccion ?? "—"} /></div>
+                                  {previewing.numero_participantes != null && (
+                                    <PreviewRow label="N° de Participantes" value={String(previewing.numero_participantes)} />
+                                  )}
                                 </>
                               ) : (
                                 <>
                                   <PreviewRow label={isPersonaFlow ? "Nombre" : "Estudiante"} value={previewing.nombre} />
                                   <PreviewRow label="Identificación" value={previewing.identificacion} />
                                   {!isPersonaFlow && <PreviewRow label="Tipo de financiación" value={previewing.tipo_persona ?? "—"} />}
+                                  {(previewing.pais || previewing.direccion || previewing.ciudad) && (
+                                    <>
+                                      <PreviewRow label="País" value={previewing.pais ?? "—"} />
+                                      <PreviewRow label="Ciudad" value={previewing.ciudad ?? "—"} />
+                                      <div className="sm:col-span-2"><PreviewRow label="Dirección" value={previewing.direccion ?? "—"} /></div>
+                                    </>
+                                  )}
                                 </>
                               )}
                               <PreviewRow label="Correo" value={previewing.email ?? "—"} />
                               <PreviewRow label="Teléfono" value={previewing.telefono ?? "—"} />
+                              {previewing.numero_inscripcion && (
+                                <PreviewRow label="N° de Inscripción" value={previewing.numero_inscripcion} />
+                              )}
                             </DetailSection>
 
                             {participantes.length > 0 && (
@@ -1221,13 +1235,18 @@ export default function AdminPanel() {
                             <PreviewRow label="Concepto" value={previewing.concepto ?? "—"} />
                             <PreviewRow label="Tipo de programa" value={previewing.tipo_programa ?? "—"} />
                             <div className="sm:col-span-2"><PreviewRow label="Programa" value={previewing.programa} /></div>
+                            {!isPersonaFlow && previewing.plan_estudio && (
+                              <div className="sm:col-span-2"><PreviewRow label="Nombre del Diplomado" value={previewing.plan_estudio} /></div>
+                            )}
                             {!isPersonaFlow && <PreviewRow label="SNIES" value={previewing.codigo_snies ?? "—"} />}
                             {isPersonaFlow && <PreviewRow label="Nemónico" value={previewing.nemonico ?? "—"} />}
                             <PreviewRow label="Cohorte" value={previewing.cohorte ?? "—"} />
                             <PreviewRow label="Periodo" value={previewing.periodo} />
                             <PreviewRow label="Fecha inicio" value={previewing.fecha_inicio ?? "—"} />
                             {previewing.fecha_fin && <PreviewRow label="Fecha fin" value={previewing.fecha_fin} />}
-                            {previewing.horas_programa != null && <PreviewRow label="Horas / duración" value={String(previewing.horas_programa)} />}
+                            {(previewing.duracion || previewing.horas_programa != null) && (
+                              <PreviewRow label="Duración" value={previewing.duracion ?? String(previewing.horas_programa)} />
+                            )}
                             {previewing.convocatoria && <PreviewRow label="Convocatoria" value={previewing.convocatoria} />}
                           </DetailSection>
 
