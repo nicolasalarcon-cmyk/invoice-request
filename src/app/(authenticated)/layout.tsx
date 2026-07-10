@@ -21,13 +21,14 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 function NavTab({
-  href, icon, label, badge, small,
+  href, icon, label, badge, small, resetInbox,
 }: {
   href: string;
   icon: React.ReactNode;
   label: string;
   badge?: string;
   small?: boolean;
+  resetInbox?: boolean;
 }) {
   const pathname = usePathname();
   const active =
@@ -38,6 +39,9 @@ function NavTab({
   return (
     <Link
       href={href}
+      onClick={() => {
+        if (resetInbox) window.dispatchEvent(new CustomEvent("app:reset-inbox"));
+      }}
       className={`relative flex items-center gap-1.5 px-3.5 py-3 font-medium transition-all duration-150 select-none
         ${small ? "text-sm" : "text-[15px]"}
         ${active
@@ -114,7 +118,11 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
       <header className="sticky top-0 z-50 border-b border-slate-200 shadow-sm bg-white/95 backdrop-blur-sm">
         {/* Top bar */}
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
-          <Link href={canViewAllRequests ? "/admin" : "/mis-recibos"} className="flex items-center gap-3">
+          <Link
+            href={canViewAllRequests ? "/admin" : "/mis-recibos"}
+            onClick={() => window.dispatchEvent(new CustomEvent("app:reset-inbox"))}
+            className="flex items-center gap-3"
+          >
             <span className="text-2xl font-bold leading-none" style={{ color: "#000b7b" }}>UdeCataluña</span>
             <div className="hidden sm:block h-6 w-px bg-slate-200" />
             <span className="hidden sm:block text-sm font-medium leading-none text-slate-500">Solicitudes</span>
@@ -147,34 +155,46 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
 
         {/* Tab navigation */}
         <div className="mx-auto max-w-7xl px-4">
-          <nav className="flex items-center gap-0.5">
+          <nav className="flex items-center gap-0.5 overflow-x-auto whitespace-nowrap [scrollbar-width:thin]">
 
             {/* ── Tabs operativas — mismo orden para todos los roles: Crear, Solicitudes, Dashboard ── */}
-            <CreateNavButton />
-            {canViewAllRequests ? (
-              <NavTab href="/admin" icon={<ClipboardList className="h-4 w-4" />} label="Solicitudes" badge={badgeCount} />
-            ) : (
-              <NavTab href="/mis-recibos" icon={<ClipboardList className="h-4 w-4" />} label="Mis recibos" />
-            )}
+            <div className="shrink-0"><CreateNavButton /></div>
+            <div className="shrink-0">
+              {canViewAllRequests ? (
+                <NavTab href="/admin" icon={<ClipboardList className="h-4 w-4" />} label="Solicitudes" badge={badgeCount} resetInbox />
+              ) : (
+                <NavTab href="/mis-recibos" icon={<ClipboardList className="h-4 w-4" />} label="Mis recibos" resetInbox />
+              )}
+            </div>
             {canViewDashboard && (
-              <NavTab href="/admin/dashboard" icon={<LayoutDashboard className="h-4 w-4" />} label="Dashboard" />
+              <div className="shrink-0">
+                <NavTab href="/admin/dashboard" icon={<LayoutDashboard className="h-4 w-4" />} label="Dashboard" />
+              </div>
             )}
 
             {/* ── Separador ── */}
-            {hasConfigTabs && <NavDivider />}
+            {hasConfigTabs && <div className="shrink-0"><NavDivider /></div>}
 
             {/* ── Tabs de configuración ── */}
             {canViewNumeracion && (
-              <NavTab href="/admin/numeracion" icon={<Hash className="h-3.5 w-3.5" />} label="Numeración" small />
+              <div className="shrink-0">
+                <NavTab href="/admin/numeracion" icon={<Hash className="h-3.5 w-3.5" />} label="Numeración" small />
+              </div>
             )}
             {canManagePrograms && (
-              <NavTab href="/admin/programas" icon={<BookOpen className="h-3.5 w-3.5" />} label="Programas" small />
+              <div className="shrink-0">
+                <NavTab href="/admin/programas" icon={<BookOpen className="h-3.5 w-3.5" />} label="Programas" small />
+              </div>
             )}
             {canManagePrograms && (
-              <NavTab href="/admin/asesores" icon={<Users className="h-3.5 w-3.5" />} label="Asesores" small />
+              <div className="shrink-0">
+                <NavTab href="/admin/asesores" icon={<Users className="h-3.5 w-3.5" />} label="Asesores" small />
+              </div>
             )}
             {canManageUsers && (
-              <NavTab href="/admin/usuarios" icon={<Users className="h-3.5 w-3.5" />} label="Usuarios" small />
+              <div className="shrink-0">
+                <NavTab href="/admin/usuarios" icon={<Users className="h-3.5 w-3.5" />} label="Usuarios" small />
+              </div>
             )}
           </nav>
         </div>

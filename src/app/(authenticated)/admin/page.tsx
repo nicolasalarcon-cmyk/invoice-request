@@ -15,7 +15,6 @@ import { formatCOP, formatDate } from "@/lib/format";
 import {
   AlertTriangle, CheckCircle2, XCircle, FileDown, Inbox, Search, Pencil,
   FileText, Trash2, Eye, Copy, Wrench, ArrowLeft,
-  User, GraduationCap, DollarSign, Paperclip, ChevronRight,
   Receipt, Globe, Landmark, Wallet, Calendar, X,
 } from "lucide-react";
 import { listTemplates, getTemplateDocType, type InvoiceTemplate } from "@/lib/invoice-template";
@@ -193,7 +192,6 @@ export default function AdminPanel() {
   const [rejectCategory, setRejectCategory] = useState("");
   const [rejectOtherText, setRejectOtherText] = useState("");
   const [previewing, setPreviewing] = useState<Req | null>(null);
-  const [detailTab, setDetailTab] = useState<"general" | "academico" | "pago" | "adjuntos">("general");
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [pdfPreviewName, setPdfPreviewName] = useState("");
   const [pdfPreviewLoading, setPdfPreviewLoading] = useState(false);
@@ -216,6 +214,12 @@ export default function AdminPanel() {
   };
 
   useEffect(() => { if (canViewAllRequests) load(); }, [canViewAllRequests]);
+
+  useEffect(() => {
+    const handler = () => setPreviewing(null);
+    window.addEventListener("app:reset-inbox", handler);
+    return () => window.removeEventListener("app:reset-inbox", handler);
+  }, []);
 
   useLiveRefresh("invoice_requests_inbox", () => load(true), canViewAllRequests);
 
@@ -710,8 +714,8 @@ export default function AdminPanel() {
       {!previewing && (
       <>
       <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-0 flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               className="rounded-xl bg-muted/40 pl-9"
@@ -785,7 +789,7 @@ export default function AdminPanel() {
           ]).map((t) => {
             const active = tipoFilter === t.id;
             const Icon = t.icon;
-            const pendientes = tipoPendingCounts[t.id] ?? 0;
+            const pendientes = statusFilter === "pendiente" ? (tipoPendingCounts[t.id] ?? 0) : 0;
             return (
               <button
                 key={t.id}
@@ -826,8 +830,8 @@ export default function AdminPanel() {
               return (
                 <div
                   key={r.id}
-                  onClick={() => { setPreviewing(r); setDetailTab("general"); }}
-                  className="group relative flex cursor-pointer flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm transition-all duration-200 hover:bg-muted/40 hover:shadow-md md:flex-row md:items-center md:justify-between"
+                  onClick={() => setPreviewing(r)}
+                  className="group relative flex cursor-pointer flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm transition-all duration-200 hover:bg-muted/40 hover:shadow-md md:flex-row md:items-center md:justify-between"
                 >
                   {/* Caja de información e identidad */}
                   <div className="flex min-w-0 flex-1 items-start gap-3.5">
@@ -864,41 +868,10 @@ export default function AdminPanel() {
                     </div>
                   </div>
 
-                  {/* Panel de precio y acciones instantáneas */}
-                  <div className="flex shrink-0 flex-col items-end gap-2">
-                    <div className="text-right">
-                      <span className="block text-xs font-bold uppercase tracking-widest text-muted-foreground">Valor a pagar</span>
-                      <span className="text-xl font-extrabold text-foreground">{formatCOP(r.valor_total_empresa ?? r.valor_total)}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                      {!isCartera && canApprove && r.status === "pendiente" && (
-                        <>
-                          <Button
-                            size="sm"
-                            className="rounded-xl bg-emerald-600 opacity-100 shadow-sm transition-opacity hover:bg-emerald-700 sm:opacity-0 sm:group-hover:opacity-100 border-0 text-white"
-                            onClick={() => openApprove(r)}
-                          >
-                            <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Aprobar
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="rounded-xl bg-rose-600 opacity-100 shadow-sm transition-opacity hover:bg-rose-700 sm:opacity-0 sm:group-hover:opacity-100 border-0 text-white"
-                            onClick={() => openRejectDialog(r)}
-                          >
-                            <XCircle className="mr-1.5 h-3.5 w-3.5" /> Rechazar
-                          </Button>
-                        </>
-                      )}
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 rounded-xl bg-muted text-muted-foreground hover:bg-muted/70"
-                        onClick={() => { setPreviewing(r); setDetailTab("general"); }}
-                        title="Ver detalle"
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </div>
+                  {/* Panel de precio */}
+                  <div className="flex shrink-0 flex-col items-center justify-center text-center md:pl-4">
+                    <span className="block text-xs font-bold uppercase tracking-widest text-muted-foreground">Valor a pagar</span>
+                    <span className="text-xl font-extrabold text-foreground">{formatCOP(r.valor_total_empresa ?? r.valor_total)}</span>
                   </div>
                 </div>
               );
@@ -1075,41 +1048,86 @@ export default function AdminPanel() {
               : [];
             const hasCurrentAttachments = (previewing.attachments && previewing.attachments.length > 0) || previewing.approved_pdf_path;
             const hasHistoricalAttachments = historicalAttachments.length > 0;
-            const TABS: { id: typeof detailTab; label: string; icon: typeof User }[] = [
-              { id: "general", label: "General", icon: User },
-              { id: "academico", label: "Académico", icon: GraduationCap },
-              { id: "pago", label: "Pago", icon: DollarSign },
-              { id: "adjuntos", label: "Adjuntos", icon: Paperclip },
-            ];
             return (
               <div className="space-y-3 pb-4">
-                <div>
-                  {/* Contenido seccionado por pestañas */}
-                  <div>
-                    <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
-                      <div className="flex gap-1 border-b border-border bg-muted/30 p-1">
-                        {TABS.map((t) => {
-                          const Icon = t.icon;
-                          const active = detailTab === t.id;
-                          return (
-                            <button
-                              key={t.id}
-                              type="button"
-                              onClick={() => setDetailTab(t.id)}
-                              className={cn(
-                                "flex flex-1 items-center justify-center gap-1.5 rounded-xl py-1.5 text-xs font-semibold transition-all",
-                                active ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground",
-                              )}
-                            >
-                              <Icon className="h-3.5 w-3.5" /> {t.label}
-                            </button>
-                          );
-                        })}
-                      </div>
+                {/* Barra de acciones — arriba, para que se vea de una */}
+                <div className="rounded-2xl border border-border bg-card/95 px-4 py-3 shadow-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button size="sm" variant="ghost" className="rounded-full" onClick={() => setPreviewing(null)}>
+                      <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Bandeja
+                    </Button>
+                    {(previewing.document_type === "orden_matricula" || previewing.document_type === "factura_usa") && (
+                      <Button size="sm" variant="outline" className="rounded-full" onClick={() => openPdfPreview(previewing)}>
+                        <Eye className="mr-1.5 h-3.5 w-3.5" /> Ver PDF
+                      </Button>
+                    )}
+                    {canEditThis && (previewing.status === "aprobada" || previewing.status === "corregida") ? (
+                      withinCorrectionWindow(previewing.approved_at) ? (
+                        <Link href={`/solicitar?id=${previewing.id}`}>
+                          <Button size="sm" variant="outline" className="rounded-full">
+                            <Wrench className="mr-1.5 h-3.5 w-3.5" /> Corregir
+                          </Button>
+                        </Link>
+                      ) : (
+                        <Button size="sm" variant="outline" className="rounded-full" disabled title="Ya pasaron más de 3 días desde la aprobación — no se puede corregir.">
+                          <Wrench className="mr-1.5 h-3.5 w-3.5" /> Corregir
+                        </Button>
+                      )
+                    ) : canEditThis && (
+                      <Link href={`/solicitar?id=${previewing.id}`}>
+                        <Button size="sm" variant="outline" className="rounded-full">
+                          <Pencil className="mr-1.5 h-3.5 w-3.5" /> Editar
+                        </Button>
+                      </Link>
+                    )}
+                    {(previewing.status === "aprobada" || previewing.status === "corregida") && (
+                      previewing.document_type === "factura_paypal" && !previewing.approved_pdf_path ? (
+                        <Button size="sm" variant="outline" className="rounded-full" onClick={() => openResponseView(previewing)}>
+                          <Eye className="mr-1.5 h-3.5 w-3.5" /> Ver Respuesta
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="outline" className="rounded-full" onClick={() => downloadPdf(previewing)}>
+                          <FileDown className="mr-1.5 h-3.5 w-3.5" /> Descargar PDF
+                        </Button>
+                      )
+                    )}
+                    {canEditThis && (previewing.status === "aprobada" || previewing.status === "corregida") && (
+                      <Button size="sm" variant="outline" className="rounded-full" onClick={() => duplicar(previewing)}>
+                        <Copy className="mr-1.5 h-3.5 w-3.5" /> Duplicar
+                      </Button>
+                    )}
 
-                      <div className="max-h-[62vh] overflow-y-auto p-5 space-y-5">
-                        {detailTab === "general" && (
-                          <>
+                    <div className="ml-auto flex items-center gap-2">
+                      {(role === "financiera" || role === "cartera")
+                        && (previewing.status === "aprobada" || previewing.status === "rechazada" || previewing.status === "corregida")
+                        && !previewing.archived_by_reviewer && (
+                        <Button size="sm" variant="outline" className="rounded-full text-red-700 border-red-200 hover:bg-red-700 hover:text-white" onClick={() => hideForReviewer(previewing)}>
+                          <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Eliminar
+                        </Button>
+                      )}
+                      {canDelete && (
+                        <Button size="sm" variant="outline" className="rounded-full text-red-700 border-red-200 hover:bg-red-700 hover:text-white" onClick={() => removeRequest(previewing)}>
+                          <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Eliminar definitivamente
+                        </Button>
+                      )}
+                      {!isCartera && canApprove && previewing.status === "pendiente" && (
+                        <>
+                          <Button size="sm" className="rounded-full bg-rose-600 hover:bg-rose-700 text-white border-0" onClick={() => openRejectDialog(previewing)}>
+                            <XCircle className="mr-1.5 h-3.5 w-3.5" /> Rechazar Solicitud
+                          </Button>
+                          <Button size="sm" className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white border-0" onClick={() => openApprove(previewing)}>
+                            <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Aprobar Solicitud
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Contenido: todas las secciones, sin pestañas */}
+                <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+                      <div className="p-5 space-y-5">
+                        <>
                             {previewing.document_type === "factura_colombia" && (
                               <DetailSection title="Recuento" noGrid>
                                 <div className="space-y-2">
@@ -1198,11 +1216,8 @@ export default function AdminPanel() {
                                 </div>
                               )}
                             </DetailSection>
-                          </>
-                        )}
 
-                        {detailTab === "academico" && (
-                          <DetailSection title="Programa">
+                            <DetailSection title="Programa">
                             <PreviewRow label="Concepto" value={previewing.concepto ?? "—"} />
                             <PreviewRow label="Tipo de programa" value={previewing.tipo_programa ?? "—"} />
                             <div className="sm:col-span-2"><PreviewRow label="Programa" value={previewing.programa} /></div>
@@ -1215,10 +1230,8 @@ export default function AdminPanel() {
                             {previewing.horas_programa != null && <PreviewRow label="Horas / duración" value={String(previewing.horas_programa)} />}
                             {previewing.convocatoria && <PreviewRow label="Convocatoria" value={previewing.convocatoria} />}
                           </DetailSection>
-                        )}
 
-                        {detailTab === "pago" && (
-                          <DetailSection title="Valores">
+                            <DetailSection title="Valores">
                             {previewing.valor_parcial != null ? (
                               <>
                                 <PreviewRow label="Valor de matrícula" value={formatCOP(previewing.matricula)} />
@@ -1242,10 +1255,8 @@ export default function AdminPanel() {
                             <PreviewRow label="Límite de pago" value={previewing.fecha_limite_pago ?? "—"} />
                             <PreviewRow label="Pago extraordinario" value={previewing.fecha_pago_extraordinario ?? "—"} />
                           </DetailSection>
-                        )}
 
-                        {detailTab === "adjuntos" && (
-                          !hasCurrentAttachments && !hasHistoricalAttachments ? (
+                            {(!hasCurrentAttachments && !hasHistoricalAttachments ? (
                             <p className="text-sm text-muted-foreground">Esta solicitud no tiene archivos adjuntos.</p>
                           ) : (
                             <DetailSection title="Adjuntos" noGrid>
@@ -1297,85 +1308,9 @@ export default function AdminPanel() {
                                 </div>
                               </div>
                             </DetailSection>
-                          )
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Barra de acciones, fija al fondo de la pantalla — una sola fila, discreta */}
-                <div className="sticky bottom-0 left-0 right-0 -mx-6 border-t border-border bg-card/95 px-6 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] backdrop-blur">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button size="sm" variant="ghost" className="rounded-full" onClick={() => setPreviewing(null)}>
-                      <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Bandeja
-                    </Button>
-                    {(previewing.document_type === "orden_matricula" || previewing.document_type === "factura_usa") && (
-                      <Button size="sm" variant="outline" className="rounded-full" onClick={() => openPdfPreview(previewing)}>
-                        <Eye className="mr-1.5 h-3.5 w-3.5" /> Ver PDF
-                      </Button>
-                    )}
-                    {canEditThis && (previewing.status === "aprobada" || previewing.status === "corregida") ? (
-                      withinCorrectionWindow(previewing.approved_at) ? (
-                        <Link href={`/solicitar?id=${previewing.id}`}>
-                          <Button size="sm" variant="outline" className="rounded-full">
-                            <Wrench className="mr-1.5 h-3.5 w-3.5" /> Corregir
-                          </Button>
-                        </Link>
-                      ) : (
-                        <Button size="sm" variant="outline" className="rounded-full" disabled title="Ya pasaron más de 3 días desde la aprobación — no se puede corregir.">
-                          <Wrench className="mr-1.5 h-3.5 w-3.5" /> Corregir
-                        </Button>
-                      )
-                    ) : canEditThis && (
-                      <Link href={`/solicitar?id=${previewing.id}`}>
-                        <Button size="sm" variant="outline" className="rounded-full">
-                          <Pencil className="mr-1.5 h-3.5 w-3.5" /> Editar
-                        </Button>
-                      </Link>
-                    )}
-                    {(previewing.status === "aprobada" || previewing.status === "corregida") && (
-                      previewing.document_type === "factura_paypal" && !previewing.approved_pdf_path ? (
-                        <Button size="sm" variant="outline" className="rounded-full" onClick={() => openResponseView(previewing)}>
-                          <Eye className="mr-1.5 h-3.5 w-3.5" /> Ver Respuesta
-                        </Button>
-                      ) : (
-                        <Button size="sm" variant="outline" className="rounded-full" onClick={() => downloadPdf(previewing)}>
-                          <FileDown className="mr-1.5 h-3.5 w-3.5" /> Descargar PDF
-                        </Button>
-                      )
-                    )}
-                    {canEditThis && (previewing.status === "aprobada" || previewing.status === "corregida") && (
-                      <Button size="sm" variant="outline" className="rounded-full" onClick={() => duplicar(previewing)}>
-                        <Copy className="mr-1.5 h-3.5 w-3.5" /> Duplicar
-                      </Button>
-                    )}
-
-                    <div className="ml-auto flex items-center gap-2">
-                      {(role === "financiera" || role === "cartera")
-                        && (previewing.status === "aprobada" || previewing.status === "rechazada" || previewing.status === "corregida")
-                        && !previewing.archived_by_reviewer && (
-                        <Button size="sm" variant="outline" className="rounded-full text-red-700 border-red-200 hover:bg-red-700 hover:text-white" onClick={() => hideForReviewer(previewing)}>
-                          <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Eliminar
-                        </Button>
-                      )}
-                      {canDelete && (
-                        <Button size="sm" variant="outline" className="rounded-full text-red-700 border-red-200 hover:bg-red-700 hover:text-white" onClick={() => removeRequest(previewing)}>
-                          <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Eliminar definitivamente
-                        </Button>
-                      )}
-                      {!isCartera && canApprove && previewing.status === "pendiente" && (
-                        <>
-                          <Button size="sm" className="rounded-full bg-rose-600 hover:bg-rose-700 text-white border-0" onClick={() => openRejectDialog(previewing)}>
-                            <XCircle className="mr-1.5 h-3.5 w-3.5" /> Rechazar Solicitud
-                          </Button>
-                          <Button size="sm" className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white border-0" onClick={() => openApprove(previewing)}>
-                            <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Aprobar Solicitud
-                          </Button>
+                          ))}
                         </>
-                      )}
-                    </div>
-                  </div>
+                      </div>
                 </div>
               </div>
             );
