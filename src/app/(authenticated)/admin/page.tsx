@@ -81,6 +81,8 @@ interface Req {
   descuento_bono: number;
   valor_total: number;
   valor_total_empresa: number | null;
+  valor_por_estudiante: number | null;
+  lista_cerrada: boolean;
   numero_participantes: number | null;
   participantes: Participante[] | null;
   recargo_total: number;
@@ -116,7 +118,13 @@ const formatCedula = (id: string) => {
 };
 
 const buildRecuento = (r: Req) => {
-  const cohorteLine = `${(r.nemonico ?? "").trim()}${(r.cohorte ?? "").trim()} ${r.programa ?? ""}`.trim();
+  const nemonico = (r.nemonico ?? "").trim();
+  const cohorte = (r.cohorte ?? "").trim();
+  // Si el cohorte ya trae el nemónico como prefijo (ej. "DIACONT07"), no lo dupliquemos.
+  const cohorteCode = nemonico && cohorte.toUpperCase().startsWith(nemonico.toUpperCase())
+    ? cohorte
+    : `${nemonico}${cohorte}`;
+  const cohorteLine = `${cohorteCode} ${r.programa ?? ""}`.trim();
   const participantesList = r.participantes && r.participantes.length > 0
     ? r.participantes
     : [{ nombre: r.nombre, cedula: r.identificacion, email: "", telefono: "" }];
@@ -167,7 +175,7 @@ async function sendInvoiceEmail(data: {
 }
 
 export default function AdminPanel() {
-  const { role, isCartera, canApprove, canDelete, canViewAllRequests, loading: authLoading } = useAuth();
+  const { user, role, isCartera, canApprove, canDelete, canViewAllRequests, loading: authLoading } = useAuth();
   const [items, setItems] = useState<Req[]>([]);
   const [templates, setTemplates] = useState<InvoiceTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -489,6 +497,7 @@ export default function AdminPanel() {
     const user = (await supabase.auth.getUser()).data.user;
     const reciboNumero = r.recibo_numero ?? String(Date.now() % 100000000);
     const today = new Date();
+    const reciboFecha = today.toISOString().slice(0, 10);
     const limite = r.fecha_limite_pago ?? new Date(today.getTime() + (tpl?.dias_limite ?? 4) * 86400000).toISOString().slice(0, 10);
     const extra = new Date(new Date(limite).getTime() + (tpl?.dias_extraordinario ?? 7) * 86400000).toISOString().slice(0, 10);
 
@@ -500,6 +509,7 @@ export default function AdminPanel() {
         approved_by: user?.id,
         approved_at: new Date().toISOString(),
         recibo_numero: reciboNumero,
+        recibo_fecha: reciboFecha,
         fecha_limite_pago: limite,
         fecha_pago_extraordinario: extra,
         template_id: selectedTemplate || null,
@@ -516,6 +526,7 @@ export default function AdminPanel() {
         const approved = {
           ...reqToPdfData(r),
           recibo_numero: reciboNumero,
+          recibo_fecha: reciboFecha,
           fecha_limite_pago: limite,
           fecha_pago_extraordinario: extra,
           template_id: selectedTemplate || null,
@@ -658,6 +669,7 @@ export default function AdminPanel() {
       valor_total_empresa: r.valor_total_empresa ? Number(r.valor_total_empresa) : null,
       numero_participantes: r.numero_participantes,
       participantes: r.participantes,
+      valor_por_estudiante: r.valor_por_estudiante ? Number(r.valor_por_estudiante) : null,
       recargo_total: Number(r.recargo_total), fecha_limite_pago: r.fecha_limite_pago,
       fecha_pago_extraordinario: r.fecha_pago_extraordinario, template_id: r.template_id,
       tipo_programa: r.tipo_programa, document_type: r.document_type, tipo_persona: r.tipo_persona,
@@ -1055,6 +1067,8 @@ export default function AdminPanel() {
       {previewing && (() => {
             const isPersonaFlow = previewing.document_type !== "orden_matricula";
             const isJuridica = previewing.tipo_persona === "Persona Jurídica";
+            // Cartera puede editar/corregir/duplicar solo lo que ella misma creó; el resto de roles no tiene esta restricción.
+            const canEditThis = !isCartera || previewing.created_by === user?.id;
             const participantes = previewing.participantes ?? [];
             const historicalAttachments = previewing.parent_id
               ? itemsById.get(previewing.parent_id)?.attachments ?? []
@@ -1166,7 +1180,9 @@ export default function AdminPanel() {
                             <DetailSection title="Estado y seguimiento">
                               <PreviewRow label={CREATOR_ROLE_LABELS[previewing.created_by_role ?? ""] ?? "Líder Comercial"} value={previewing.comercial_nombre ?? "—"} />
                               <PreviewRow label={`Correo ${CREATOR_ROLE_LABELS[previewing.created_by_role ?? ""] ?? "Líder Comercial"}`} value={previewing.comercial_email ?? "—"} />
-                              <PreviewRow label="Asesor Comercial" value={previewing.asesor_nombre ?? "—"} />
+                              {previewing.asesor_nombre && (
+                                <PreviewRow label="Asesor Comercial" value={previewing.asesor_nombre} />
+                              )}
                               <PreviewRow label="Creada" value={formatDate(previewing.created_at)} />
                               {previewing.approved_at && <PreviewRow label="Aprobada" value={formatDate(previewing.approved_at)} />}
                               {previewing.observaciones && (
@@ -1218,6 +1234,9 @@ export default function AdminPanel() {
                             <PreviewRow label="Valor total a pagar" value={formatCOP(previewing.valor_total)} />
                             {previewing.valor_total_empresa != null && (
                               <PreviewRow label="Valor total empresa" value={formatCOP(previewing.valor_total_empresa)} />
+                            )}
+                            {previewing.valor_por_estudiante != null && (
+                              <PreviewRow label="Valor por estudiante" value={formatCOP(previewing.valor_por_estudiante)} />
                             )}
                             <PreviewRow label="Recargo por mora" value={formatCOP(previewing.recargo_total)} />
                             <PreviewRow label="Límite de pago" value={previewing.fecha_limite_pago ?? "—"} />
@@ -1296,7 +1315,7 @@ export default function AdminPanel() {
                         <Eye className="mr-1.5 h-3.5 w-3.5" /> Ver PDF
                       </Button>
                     )}
-                    {!isCartera && (previewing.status === "aprobada" || previewing.status === "corregida") ? (
+                    {canEditThis && (previewing.status === "aprobada" || previewing.status === "corregida") ? (
                       withinCorrectionWindow(previewing.approved_at) ? (
                         <Link href={`/solicitar?id=${previewing.id}`}>
                           <Button size="sm" variant="outline" className="rounded-full">
@@ -1308,7 +1327,7 @@ export default function AdminPanel() {
                           <Wrench className="mr-1.5 h-3.5 w-3.5" /> Corregir
                         </Button>
                       )
-                    ) : !isCartera && (
+                    ) : canEditThis && (
                       <Link href={`/solicitar?id=${previewing.id}`}>
                         <Button size="sm" variant="outline" className="rounded-full">
                           <Pencil className="mr-1.5 h-3.5 w-3.5" /> Editar
@@ -1326,7 +1345,7 @@ export default function AdminPanel() {
                         </Button>
                       )
                     )}
-                    {!isCartera && (previewing.status === "aprobada" || previewing.status === "corregida") && (
+                    {canEditThis && (previewing.status === "aprobada" || previewing.status === "corregida") && (
                       <Button size="sm" variant="outline" className="rounded-full" onClick={() => duplicar(previewing)}>
                         <Copy className="mr-1.5 h-3.5 w-3.5" /> Duplicar
                       </Button>

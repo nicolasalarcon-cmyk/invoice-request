@@ -161,19 +161,26 @@ export function FacturaUSADocument({
   data: InvoiceData;
   _tpl: InvoiceTemplate;
 }) {
+  const participante = [data.nombre, data.identificacion].filter(Boolean).join("  ");
+  const participantes = (data.participantes ?? []) as { nombre: string; cedula: string; email: string; telefono: string }[];
+  const qty = participantes.length > 0 ? participantes.length : 1;
+
+  // subtotalUnit es el valor por estudiante (o el valor total cuando no hay
+  // varios participantes); subtotal/descuento/total ya reflejan lo que paga
+  // la empresa en conjunto (unitario × cantidad).
   const subtotalUnit = Number(data.matricula) || 0;
   const descuentoUnit = Number(data.descuento_bono) || Number(data.descuento) || 0;
-  const subtotal = subtotalUnit;
-  const descuento = descuentoUnit;
-  const total = Number(data.valor_total) || Math.max(subtotal - descuento, 0);
+  const subtotal = subtotalUnit * qty;
+  const descuento = descuentoUnit * qty;
+  const total = data.valor_total_empresa != null
+    ? Number(data.valor_total_empresa)
+    : (Number(data.valor_total) || Math.max(subtotal - descuento, 0));
 
   const mainDesc =
     [data.nemonico, data.programa].filter(Boolean).join(" ").trim() ||
     data.programa ||
     data.plan_estudio ||
     "Programa";
-  const participante = [data.nombre, data.identificacion].filter(Boolean).join("  ");
-  const participantes = (data.participantes ?? []) as { nombre: string; cedula: string; email: string; telefono: string }[];
 
   return (
     <Document>
@@ -252,7 +259,7 @@ export function FacturaUSADocument({
 
         <View style={s.tableRow}>
           <View style={s.colQty}>
-            <Text style={{ fontSize: 9, color: "#28292C" }}>1</Text>
+            <Text style={{ fontSize: 9, color: "#28292C" }}>{qty}</Text>
           </View>
           <View style={s.colDesc}>
             <Text style={s.descMain}>{mainDesc}</Text>

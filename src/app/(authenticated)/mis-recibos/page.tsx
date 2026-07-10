@@ -39,7 +39,13 @@ const formatCedula = (id: string) => {
 };
 
 const buildRecuento = (r: Req) => {
-  const cohorteLine = `${(r.nemonico ?? "").trim()}${(r.cohorte ?? "").trim()} ${r.programa ?? ""}`.trim();
+  const nemonico = (r.nemonico ?? "").trim();
+  const cohorte = (r.cohorte ?? "").trim();
+  // Si el cohorte ya trae el nemónico como prefijo (ej. "DIACONT07"), no lo dupliquemos.
+  const cohorteCode = nemonico && cohorte.toUpperCase().startsWith(nemonico.toUpperCase())
+    ? cohorte
+    : `${nemonico}${cohorte}`;
+  const cohorteLine = `${cohorteCode} ${r.programa ?? ""}`.trim();
   const participantesList = r.participantes && r.participantes.length > 0
     ? r.participantes
     : [{ nombre: r.nombre, cedula: r.identificacion, email: "", telefono: "" }];
@@ -84,6 +90,7 @@ interface Req {
   descuento_bono: number;
   valor_total: number;
   valor_total_empresa: number | null;
+  valor_por_estudiante: number | null;
   numero_participantes: number | null;
   participantes: Participante[] | null;
   recargo_total: number;
@@ -209,6 +216,10 @@ export default function MisRecibos() {
       descuento_pct: Number(r.descuento_pct ?? 0),
       descuento_bono: Number(r.descuento_bono ?? 0),
       valor_total: Number(r.valor_total ?? 0),
+      valor_total_empresa: r.valor_total_empresa ? Number(r.valor_total_empresa) : null,
+      valor_por_estudiante: r.valor_por_estudiante ? Number(r.valor_por_estudiante) : null,
+      numero_participantes: r.numero_participantes,
+      participantes: r.participantes,
       recargo_total: Number(r.recargo_total),
       fecha_limite_pago: r.fecha_limite_pago,
       fecha_pago_extraordinario: r.fecha_pago_extraordinario,
@@ -613,7 +624,9 @@ export default function MisRecibos() {
                             <DetailSection title="Estado y seguimiento">
                               <PreviewRow label="Líder Comercial" value={previewing.comercial_nombre ?? "—"} />
                               <PreviewRow label="Correo Líder Comercial" value={previewing.comercial_email ?? "—"} />
-                              <PreviewRow label="Asesor Comercial" value={previewing.asesor_nombre ?? "—"} />
+                              {previewing.asesor_nombre && (
+                                <PreviewRow label="Asesor Comercial" value={previewing.asesor_nombre} />
+                              )}
                               <PreviewRow label="Creada" value={formatDate(previewing.created_at)} />
                               {previewing.approved_at && <PreviewRow label="Aprobada" value={formatDate(previewing.approved_at)} />}
                               {previewing.observaciones && (
@@ -665,6 +678,9 @@ export default function MisRecibos() {
                             <PreviewRow label="Valor total a pagar" value={formatCOP(previewing.valor_total)} />
                             {previewing.valor_total_empresa != null && (
                               <PreviewRow label="Valor total empresa" value={formatCOP(previewing.valor_total_empresa)} />
+                            )}
+                            {previewing.valor_por_estudiante != null && (
+                              <PreviewRow label="Valor por estudiante" value={formatCOP(previewing.valor_por_estudiante)} />
                             )}
                             <PreviewRow label="Recargo por mora" value={formatCOP(previewing.recargo_total)} />
                             <PreviewRow label="Límite de pago" value={previewing.fecha_limite_pago ?? "—"} />

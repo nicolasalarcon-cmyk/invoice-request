@@ -20,6 +20,7 @@ export interface InvoiceData extends ResolverData {
   valor_parcial?: number | null;
   valor_total?: number | null;
   valor_total_empresa?: number | null;
+  valor_por_estudiante?: number | null;
   numero_participantes?: number | null;
   participantes?: Participant[] | null;
   descuento?: number | null;

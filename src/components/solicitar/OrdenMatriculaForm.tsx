@@ -36,6 +36,7 @@ const SECTION_TITLE_BY_ROLE: Record<string, string> = {
 interface FormState {
   nombre: string;
   identificacion: string;
+  numero_inscripcion: string;
   email: string;
   asesor_nombre: string;
   tipo_financiacion: string;
@@ -62,7 +63,7 @@ interface FormState {
 }
 
 const EMPTY: FormState = {
-  nombre: "", identificacion: "", email: "", asesor_nombre: "", tipo_financiacion: "",
+  nombre: "", identificacion: "", numero_inscripcion: "", email: "", asesor_nombre: "", tipo_financiacion: "",
   tipo_programa: "Diplomado", programa: "", programa_nemonico: "",
   codigo_snies: "", cohorte: "", plan_estudio: "",
   fecha_inicio: "", fecha_fin: "", horas_programa: "",
@@ -95,6 +96,7 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
   const [autoApprove, setAutoApprove] = useState(false);
   const [cfg, setCfg] = useState<FormConfig | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY);
+  const [usarValorParcial, setUsarValorParcial] = useState(false);
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [historicalAttachments, setHistoricalAttachments] = useState<AttachmentItem[]>([]);
   const [originalStatus, setOriginalStatus] = useState<string | null>(null);
@@ -136,6 +138,7 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
     setForm({
       nombre: data.nombre ?? "",
       identificacion: data.identificacion ?? "",
+      numero_inscripcion: (d.numero_inscripcion as string) ?? "",
       email: data.email ?? "",
       asesor_nombre: (d.asesor_nombre as string) ?? "",
       tipo_financiacion: (d.tipo_persona as string) ?? "",
@@ -160,6 +163,7 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
       fecha_limite_pago: data.fecha_limite_pago ?? "",
       observaciones: data.observaciones ?? "",
     });
+    setUsarValorParcial(d.valor_parcial != null && Number(d.valor_parcial) > 0);
   };
 
   useEffect(() => {
@@ -214,19 +218,22 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
   };
 
   const isMatriculaParcial = form.concepto_opcion === "Matrícula Parcial";
-  const isPartialActive = isMatriculaParcial && Number(form.valor_parcial) > 0;
+  const isPartialActive = isMatriculaParcial && usarValorParcial && Number(form.valor_parcial) > 0;
 
-  const { valor, descuento, descuentoBono, valorTotal } = useMemo(() => {
+  // "Valor Total" que se muestra en el formulario siempre es el cálculo normal
+  // (valor - descuento - bono), sin importar si el valor parcial está activo.
+  const { valor, descuento, descuentoBono, valorTotal: displayTotal } = useMemo(() => {
     const v = Number(form.valor) || 0;
-    if (isPartialActive) {
-      return { valor: v, descuento: 0, descuentoBono: 0, valorTotal: Number(form.valor_parcial) || 0 };
-    }
     const pct = Math.min(Math.max(Number(form.descuento_pct) || 0, 0), 100);
     const d = Math.round((v * pct) / 100);
     const bono = Math.max(Number(form.descuento_bono) || 0, 0);
     const total = Math.max(v - d - bono, 0);
     return { valor: v, descuento: d, descuentoBono: bono, valorTotal: total };
-  }, [form.valor, form.descuento_pct, form.descuento_bono, isPartialActive, form.valor_parcial]);
+  }, [form.valor, form.descuento_pct, form.descuento_bono]);
+
+  // Valor que realmente se factura: si el valor parcial está activo, ese es el
+  // que manda; si no, es el mismo que se muestra como Valor Total.
+  const valorTotal = isPartialActive ? (Number(form.valor_parcial) || 0) : displayTotal;
 
   const fieldVisible = (key: string) => cfg?.fields?.[key]?.visible !== false;
   const fieldLabel = (key: string, fallback: string) => cfg?.fields?.[key]?.label ?? fallback;
@@ -242,8 +249,12 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
       toast.error("Escribe el concepto personalizado.");
       return;
     }
-    if (!form.asesor_nombre) {
+    if (role === "comercial" && !form.asesor_nombre) {
       toast.error("Selecciona el asesor comercial correspondiente.");
+      return;
+    }
+    if (role === "cartera" && !form.numero_inscripcion.trim()) {
+      toast.error("El número de inscripción es obligatorio.");
       return;
     }
     setBusy(true);
@@ -258,6 +269,7 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
         document_type: "orden_matricula",
         nombre: form.nombre,
         identificacion: form.identificacion,
+        numero_inscripcion: form.numero_inscripcion || null,
         email: form.email || null,
         asesor_nombre: form.asesor_nombre || null,
         tipo_programa: form.tipo_programa,
@@ -274,8 +286,8 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
         concepto: conceptoFinal,
         matricula: valor,
         descuento,
-        descuento_pct: isMatriculaParcial ? 0 : (Number(form.descuento_pct) || 0),
-        descuento_bono: descuentoBono,
+        descuento_pct: isPartialActive ? 0 : (Number(form.descuento_pct) || 0),
+        descuento_bono: isPartialActive ? 0 : descuentoBono,
         valor_total: valorTotal,
         recargo_total: Math.round(valorTotal * 1.1),
         valor_parcial: isPartialActive ? Number(form.valor_parcial) : null,
@@ -376,10 +388,14 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
       </Section>
 
       <Section title="Asignar Asesor">
-        <Field label="Asesor Comercial *">
-          <Select value={form.asesor_nombre} onValueChange={(v) => update("asesor_nombre", v)}>
+        <Field label={role === "comercial" ? "Asesor Comercial *" : "Asesor Comercial"}>
+          <Select
+            value={form.asesor_nombre || "__none__"}
+            onValueChange={(v) => update("asesor_nombre", v === "__none__" ? "" : v)}
+          >
             <SelectTrigger><SelectValue placeholder="Selecciona el asesor" /></SelectTrigger>
             <SelectContent>
+              {role !== "comercial" && <SelectItem value="__none__">Sin asignar</SelectItem>}
               {asesorOptions.map((a) => (
                 <SelectItem key={a.id} value={a.nombre}>{a.nombre}</SelectItem>
               ))}
@@ -395,6 +411,9 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
           </Field>
           <Field label="Número de Identificación *">
             <Input required minLength={4} maxLength={30} type="text" inputMode="numeric" value={form.identificacion} onChange={(e) => update("identificacion", e.target.value.replace(/\D/g, ""))} />
+          </Field>
+          <Field label={role === "cartera" ? "N° de Inscripción *" : "N° de Inscripción"}>
+            <Input required={role === "cartera"} maxLength={100} value={form.numero_inscripcion} onChange={(e) => update("numero_inscripcion", e.target.value)} />
           </Field>
           {fieldVisible("email_estudiante") && (
             <Field label={fieldLabel("email_estudiante", "Correo Electrónico")}>
@@ -560,42 +579,50 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
           <Field label="Valor (COP) *">
             <Input required type="number" min={0} value={form.valor} onChange={(e) => update("valor", e.target.value)} />
           </Field>
-          {isMatriculaParcial ? (
-            <Field label="Valor Parcial a Facturar (COP) *">
-              <Input
-                required
-                type="number"
-                min={0}
-                value={form.valor_parcial}
-                onChange={(e) => update("valor_parcial", e.target.value)}
-                placeholder="Monto acordado a facturar"
-              />
-            </Field>
-          ) : (
-            <>
-              <Field label="Descuento (%)">
-                <Input type="number" min={0} max={100} step="0.01" value={form.descuento_pct} onChange={(e) => update("descuento_pct", e.target.value)} />
-              </Field>
-              <Field label="Descuento Bono (COP)">
-                <Input type="number" min={0} step="1" value={form.descuento_bono} onChange={(e) => update("descuento_bono", e.target.value)} placeholder="0" />
-              </Field>
-            </>
-          )}
+          <Field label="Descuento (%)">
+            <Input type="number" min={0} max={100} step="0.01" value={form.descuento_pct} onChange={(e) => update("descuento_pct", e.target.value)} />
+          </Field>
+          <Field label="Descuento Bono (COP)">
+            <Input type="number" min={0} step="1" value={form.descuento_bono} onChange={(e) => update("descuento_bono", e.target.value)} placeholder="0" />
+          </Field>
           <Field label="Valor Total">
             <div className="flex h-9 items-center rounded-md border border-input bg-muted px-3 text-sm font-medium text-foreground">
-              {formatCOP(valorTotal)}
+              {formatCOP(displayTotal)}
             </div>
-            {isMatriculaParcial ? (
-              <p className="mt-1 text-xs text-muted-foreground">Valor parcial acordado — no aplica descuento.</p>
-            ) : (
-              <p className="mt-1 text-xs text-muted-foreground">
-                {formatCOP(valor)} − {formatCOP(descuento)} (desc.) − {formatCOP(descuentoBono)} (bono)
-              </p>
-            )}
+            <p className="mt-1 text-xs text-muted-foreground">
+              {formatCOP(valor)} − {formatCOP(descuento)} (desc.) − {formatCOP(descuentoBono)} (bono)
+            </p>
           </Field>
           <Field label="Fecha Límite de Pago *">
             <Input required type="date" value={form.fecha_limite_pago} onChange={(e) => update("fecha_limite_pago", e.target.value)} />
           </Field>
+          {isMatriculaParcial && (
+            <div className="sm:col-span-2">
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={usarValorParcial}
+                  onChange={(e) => setUsarValorParcial(e.target.checked)}
+                />
+                Valor parcial a pagar
+              </label>
+              {usarValorParcial && (
+                <>
+                  <Input
+                    className="mt-2 max-w-xs"
+                    required
+                    type="number"
+                    min={0}
+                    value={form.valor_parcial}
+                    onChange={(e) => update("valor_parcial", e.target.value)}
+                    placeholder="Valor Parcial a Facturar (COP)"
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">Este valor es el que finalmente se factura, en vez del Valor Total.</p>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </Section>
 

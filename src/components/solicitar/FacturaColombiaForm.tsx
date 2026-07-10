@@ -46,6 +46,7 @@ interface CoForm {
   // Persona Natural
   nombre: string;
   cedula: string;
+  numero_inscripcion: string;
   email_natural: string;
   telefono_natural: string;
   // Persona Jurídica
@@ -57,6 +58,8 @@ interface CoForm {
   ciudad: string;
   telefono: string;
   numero_participantes: string;
+  lista_cerrada: boolean;
+  valor_por_estudiante: string;
   // Shared
   programa: string;
   nemonico: string;
@@ -71,9 +74,10 @@ interface CoForm {
 const EMPTY: CoForm = {
   tipo_persona: "",
   asesor_nombre: "",
-  nombre: "", cedula: "", email_natural: "", telefono_natural: "",
+  nombre: "", cedula: "", numero_inscripcion: "", email_natural: "", telefono_natural: "",
   empresa: "", nit: "", email_empresa: "", pais: "Colombia", direccion: "",
   ciudad: "", telefono: "", numero_participantes: "",
+  lista_cerrada: true, valor_por_estudiante: "",
   programa: "", nemonico: "", cohorte: "", fecha_inicio: "",
   valor: "", descuento_pct: "0", fecha_limite_pago: "", observaciones: "",
 };
@@ -135,6 +139,7 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
       asesor_nombre: (d.asesor_nombre as string) ?? "",
       nombre: data.nombre ?? "",
       cedula: data.identificacion ?? "",
+      numero_inscripcion: (d.numero_inscripcion as string) ?? "",
       email_natural: isNatural ? (data.email ?? "") : "",
       telefono_natural: isNatural ? ((d.telefono as string) ?? "") : "",
       empresa: (d.empresa as string) ?? "",
@@ -145,6 +150,8 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
       ciudad: (d.ciudad as string) ?? "",
       telefono: !isNatural ? ((d.telefono as string) ?? "") : "",
       numero_participantes: d.numero_participantes != null ? String(d.numero_participantes) : "",
+      lista_cerrada: (d.lista_cerrada as boolean | null) ?? true,
+      valor_por_estudiante: d.valor_por_estudiante != null ? String(d.valor_por_estudiante) : "",
       programa: data.programa ?? "",
       nemonico: (d.nemonico as string) ?? "",
       cohorte: data.cohorte ?? "",
@@ -210,17 +217,38 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
     return { valorNum: v, descuentoPct: pct, descuentoFlat: flat, computedTotal: total };
   }, [form.valor, form.descuento_pct]);
 
+  // Persona Jurídica + lista abierta: cobro por participante (valor por
+  // estudiante menos descuento, multiplicado por el número de participantes).
+  const numParticipantes = Math.max(0, Number(form.numero_participantes) || 0);
+  const isJuridicaAbierta = form.tipo_persona === "Persona Jurídica" && !form.lista_cerrada;
+  const { valorPorEstudianteNum, valorTotalPorEstudiante, valorTotalEmpresa } = useMemo(() => {
+    const vpe = Number(form.valor_por_estudiante) || 0;
+    const pct = Math.min(Math.max(Number(form.descuento_pct) || 0, 0), 100);
+    const totalPorEstudiante = Math.max(vpe - Math.round((vpe * pct) / 100), 0);
+    return {
+      valorPorEstudianteNum: vpe,
+      valorTotalPorEstudiante: totalPorEstudiante,
+      valorTotalEmpresa: totalPorEstudiante * numParticipantes,
+    };
+  }, [form.valor_por_estudiante, form.descuento_pct, numParticipantes]);
+  // Lista cerrada: valor por estudiante es solo informativo (valor total ÷ participantes).
+  const valorPorEstudianteInformativo = form.tipo_persona === "Persona Jurídica" && form.lista_cerrada && numParticipantes > 0
+    ? Math.round(computedTotal / numParticipantes)
+    : 0;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     if (!form.tipo_persona) { toast.error("Selecciona el tipo de persona."); return; }
-    if (!form.asesor_nombre) { toast.error("Selecciona el asesor comercial correspondiente."); return; }
+    if (role === "comercial" && !form.asesor_nombre) { toast.error("Selecciona el asesor comercial correspondiente."); return; }
+    if (role === "cartera" && !form.numero_inscripcion.trim()) { toast.error("El número de inscripción es obligatorio."); return; }
     setBusy(true);
     try {
       const today = new Date();
       const periodo = `${today.getFullYear()}`;
       const isNatural = form.tipo_persona === "Persona Natural";
       const isJuridica = form.tipo_persona === "Persona Jurídica";
+      const isAbierta = isJuridica && !form.lista_cerrada;
 
       const payload = {
         document_type: "factura_colombia",
@@ -228,15 +256,17 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
         asesor_nombre: form.asesor_nombre || null,
         nombre: isNatural ? form.nombre : form.empresa,
         identificacion: isNatural ? form.cedula : (form.nit || form.empresa.slice(0, 20)),
+        numero_inscripcion: form.numero_inscripcion || null,
         email: isNatural ? (form.email_natural || null) : (form.email_empresa || null),
         telefono: isNatural ? (form.telefono_natural || null) : (form.telefono || null),
         empresa: isNatural ? null : (form.empresa || null),
         nit: isNatural ? null : (form.nit || null),
-        pais: isNatural ? null : (form.pais || null),
-        direccion: isNatural ? null : (form.direccion || null),
-        ciudad: isNatural ? null : (form.ciudad || null),
+        pais: form.pais || null,
+        direccion: form.direccion || null,
+        ciudad: form.ciudad || null,
         numero_participantes: isJuridica && form.numero_participantes ? Number(form.numero_participantes) : null,
-        participantes: (isJuridica ? participants : []) as unknown as Json,
+        participantes: (isAbierta ? participants : []) as unknown as Json,
+        lista_cerrada: isJuridica ? form.lista_cerrada : true,
         tipo_programa: "Factura Colombia",
         programa: form.programa,
         nemonico: form.nemonico || null,
@@ -247,13 +277,14 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
         fecha_fin: null, horas_programa: null, duracion: null, convocatoria: null,
         periodo,
         concepto: "Factura Colombia",
-        matricula: valorNum,
-        descuento: descuentoFlat,
+        matricula: isAbierta ? valorPorEstudianteNum : valorNum,
+        descuento: isAbierta ? (valorPorEstudianteNum - valorTotalPorEstudiante) : descuentoFlat,
         descuento_pct: descuentoPct,
-        descuento_bono: descuentoFlat,
-        valor_total: computedTotal,
-        valor_total_empresa: null,
-        recargo_total: computedTotal,
+        descuento_bono: isAbierta ? (valorPorEstudianteNum - valorTotalPorEstudiante) : descuentoFlat,
+        valor_total: isAbierta ? valorTotalPorEstudiante : computedTotal,
+        valor_total_empresa: isJuridica ? (isAbierta ? valorTotalEmpresa : computedTotal) : null,
+        valor_por_estudiante: isJuridica ? (isAbierta ? valorTotalPorEstudiante : (valorPorEstudianteInformativo || null)) : null,
+        recargo_total: isAbierta ? valorTotalEmpresa : computedTotal,
         fecha_limite_pago: form.fecha_limite_pago,
         observaciones: form.observaciones || null,
         attachments,
@@ -345,10 +376,14 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
       </Section>
 
       <Section title="Asignar Asesor">
-        <Field label="Asesor Comercial *">
-          <Select value={form.asesor_nombre} onValueChange={(v) => update("asesor_nombre", v)}>
+        <Field label={role === "comercial" ? "Asesor Comercial *" : "Asesor Comercial"}>
+          <Select
+            value={form.asesor_nombre || "__none__"}
+            onValueChange={(v) => update("asesor_nombre", v === "__none__" ? "" : v)}
+          >
             <SelectTrigger><SelectValue placeholder="Selecciona el asesor" /></SelectTrigger>
             <SelectContent>
+              {role !== "comercial" && <SelectItem value="__none__">Sin asignar</SelectItem>}
               {asesorOptions.map((a) => (
                 <SelectItem key={a.id} value={a.nombre}>{a.nombre}</SelectItem>
               ))}
@@ -380,11 +415,23 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
             <Field label="Número de Identificación *">
               <Input required maxLength={50} type="text" inputMode="numeric" value={form.cedula} onChange={(e) => update("cedula", e.target.value.replace(/\D/g, ""))} />
             </Field>
+            <Field label={role === "cartera" ? "N° de Inscripción *" : "N° de Inscripción"}>
+              <Input required={role === "cartera"} maxLength={100} value={form.numero_inscripcion} onChange={(e) => update("numero_inscripcion", e.target.value)} />
+            </Field>
             <Field label="Correo Electrónico">
               <Input type="email" maxLength={200} value={form.email_natural} onChange={(e) => update("email_natural", e.target.value)} />
             </Field>
             <Field label="Teléfono">
               <Input maxLength={50} type="text" inputMode="numeric" value={form.telefono_natural} onChange={(e) => update("telefono_natural", e.target.value.replace(/\D/g, ""))} />
+            </Field>
+            <Field label="País *">
+              <Input required maxLength={100} value={form.pais} onChange={(e) => update("pais", e.target.value)} />
+            </Field>
+            <Field label="Dirección *">
+              <Input required maxLength={300} value={form.direccion} onChange={(e) => update("direccion", e.target.value)} />
+            </Field>
+            <Field label="Ciudad *">
+              <Input required maxLength={150} value={form.ciudad} onChange={(e) => update("ciudad", e.target.value)} />
             </Field>
           </div>
         </Section>
@@ -426,11 +473,27 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
                   onChange={(e) => update("numero_participantes", e.target.value)}
                 />
               </Field>
+              <div className="sm:col-span-2">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4"
+                    checked={form.lista_cerrada}
+                    onChange={(e) => update("lista_cerrada", e.target.checked)}
+                  />
+                  Lista Cerrada
+                </label>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {form.lista_cerrada
+                    ? "Solo se registra el número de participantes, sin sus datos individuales."
+                    : "Se piden los datos de cada participante y se cobra por estudiante."}
+                </p>
+              </div>
             </div>
           </Section>
 
           {/* ── PARTICIPANTES DINÁMICOS ── */}
-          {participants.map((p, i) => (
+          {!form.lista_cerrada && participants.map((p, i) => (
             <Section key={i} title={`Participante ${i + 1}`}>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Nombre Completo *">
@@ -525,27 +588,65 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
           {/* Factura */}
           <Section title="Datos de la factura">
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Valor Total del Programa *">
-                <Input required type="number" min={0} value={form.valor} onChange={(e) => update("valor", e.target.value)} />
-              </Field>
-              <Field label="Descuento (%)">
-                <Input type="number" min={0} max={100} step="0.01" value={form.descuento_pct} onChange={(e) => update("descuento_pct", e.target.value)} />
-              </Field>
+              {isJuridicaAbierta ? (
+                <>
+                  <Field label="Valor por Estudiante *">
+                    <Input required type="number" min={0} value={form.valor_por_estudiante} onChange={(e) => update("valor_por_estudiante", e.target.value)} />
+                  </Field>
+                  <Field label="Descuento (%)">
+                    <Input type="number" min={0} max={100} step="0.01" value={form.descuento_pct} onChange={(e) => update("descuento_pct", e.target.value)} />
+                  </Field>
+                  <Field label="Valor Total por Estudiante">
+                    <div className="flex h-9 items-center rounded-md border border-input bg-muted px-3 text-sm font-medium text-foreground">
+                      {formatCOP(valorTotalPorEstudiante)}
+                    </div>
+                  </Field>
+                  <Field label="Valor Total a Pagar por la Empresa">
+                    <div className="flex h-9 items-center rounded-md border border-input bg-muted px-3 text-sm font-medium text-foreground">
+                      {formatCOP(valorTotalEmpresa)}
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {formatCOP(valorTotalPorEstudiante)} × {numParticipantes} participante(s)
+                    </p>
+                  </Field>
+                  <Field label="Fecha de Vencimiento de la Factura *">
+                    <Input required type="date" value={form.fecha_limite_pago} onChange={(e) => update("fecha_limite_pago", e.target.value)} />
+                  </Field>
+                </>
+              ) : (
+                <>
+                  <Field label="Valor Total del Programa *">
+                    <Input required type="number" min={0} value={form.valor} onChange={(e) => update("valor", e.target.value)} />
+                  </Field>
+                  <Field label="Descuento (%)">
+                    <Input type="number" min={0} max={100} step="0.01" value={form.descuento_pct} onChange={(e) => update("descuento_pct", e.target.value)} />
+                  </Field>
 
-              <Field label="Valor Total a Pagar">
-                <div className="flex h-9 items-center rounded-md border border-input bg-muted px-3 text-sm font-medium text-foreground">
-                  {formatCOP(computedTotal)}
-                </div>
-                {descuentoFlat > 0 && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {formatCOP(valorNum)} − {formatCOP(descuentoFlat)} ({descuentoPct}%)
-                  </p>
-                )}
-              </Field>
+                  <Field label="Valor Total a Pagar">
+                    <div className="flex h-9 items-center rounded-md border border-input bg-muted px-3 text-sm font-medium text-foreground">
+                      {formatCOP(computedTotal)}
+                    </div>
+                    {descuentoFlat > 0 && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {formatCOP(valorNum)} − {formatCOP(descuentoFlat)} ({descuentoPct}%)
+                      </p>
+                    )}
+                  </Field>
 
-              <Field label="Fecha de Vencimiento de la Factura *">
-                <Input required type="date" value={form.fecha_limite_pago} onChange={(e) => update("fecha_limite_pago", e.target.value)} />
-              </Field>
+                  {isJuridica && numParticipantes > 0 && (
+                    <Field label="Valor por Estudiante">
+                      <div className="flex h-9 items-center rounded-md border border-input bg-muted px-3 text-sm font-medium text-foreground">
+                        {formatCOP(valorPorEstudianteInformativo)}
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">Informativo: valor total ÷ {numParticipantes} participante(s).</p>
+                    </Field>
+                  )}
+
+                  <Field label="Fecha de Vencimiento de la Factura *">
+                    <Input required type="date" value={form.fecha_limite_pago} onChange={(e) => update("fecha_limite_pago", e.target.value)} />
+                  </Field>
+                </>
+              )}
             </div>
           </Section>
 

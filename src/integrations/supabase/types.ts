@@ -140,6 +140,7 @@ export type Database = {
           id: string
           identificacion: string
           info_requested: string | null
+          lista_cerrada: boolean
           matricula: number
           nemonico: string | null
           nit: string | null
@@ -166,6 +167,7 @@ export type Database = {
           tipo_programa: string | null
           updated_at: string
           valor_parcial: number | null
+          valor_por_estudiante: number | null
           valor_total: number
           valor_total_empresa: number | null
         }
@@ -204,6 +206,7 @@ export type Database = {
           id?: string
           identificacion: string
           info_requested?: string | null
+          lista_cerrada?: boolean
           matricula?: number
           nemonico?: string | null
           nit?: string | null
@@ -230,6 +233,7 @@ export type Database = {
           tipo_programa?: string | null
           updated_at?: string
           valor_parcial?: number | null
+          valor_por_estudiante?: number | null
           valor_total?: number
           valor_total_empresa?: number | null
         }
@@ -268,6 +272,7 @@ export type Database = {
           id?: string
           identificacion?: string
           info_requested?: string | null
+          lista_cerrada?: boolean
           matricula?: number
           nemonico?: string | null
           nit?: string | null
@@ -294,6 +299,7 @@ export type Database = {
           tipo_programa?: string | null
           updated_at?: string
           valor_parcial?: number | null
+          valor_por_estudiante?: number | null
           valor_total?: number
           valor_total_empresa?: number | null
         }
