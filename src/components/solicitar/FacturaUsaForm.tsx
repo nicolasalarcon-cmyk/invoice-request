@@ -64,6 +64,7 @@ interface UsaForm {
   valor_por_estudiante: string;
   // Shared
   programa: string;
+  programaTipo: string;
   nemonico: string;
   cohorte: string;
   fecha_inicio: string;
@@ -80,7 +81,7 @@ const EMPTY: UsaForm = {
   empresa: "", nit: "", email_empresa: "", pais: "", direccion: "",
   ciudad: "", telefono: "", numero_participantes: "",
   lista_cerrada: true, valor_por_estudiante: "",
-  programa: "", nemonico: "", cohorte: "", fecha_inicio: "",
+  programa: "", programaTipo: "", nemonico: "", cohorte: "", fecha_inicio: "",
   valor: "", descuento_pct: "0", fecha_limite_pago: "", observaciones: "",
 };
 
@@ -162,6 +163,7 @@ export function FacturaUsaForm({ editId, duplicateFromId }: { editId?: string; d
       lista_cerrada: (d.lista_cerrada as boolean | null) ?? true,
       valor_por_estudiante: d.valor_por_estudiante != null ? String(d.valor_por_estudiante) : "",
       programa: data.programa ?? "",
+      programaTipo: (d.tipo_programa as string) ?? "",
       nemonico: (d.nemonico as string) ?? "",
       cohorte: data.cohorte ?? "",
       fecha_inicio: data.fecha_inicio ?? "",
@@ -202,7 +204,7 @@ export function FacturaUsaForm({ editId, duplicateFromId }: { editId?: string; d
     setParticipants((prev) => prev.map((p, i) => i === idx ? { ...p, [key]: value } : p));
 
   const pickPrograma = (p: Programa) => {
-    setForm((f) => ({ ...f, programa: p.nombre, nemonico: p.nemonico ?? "", cohorte: "", fecha_inicio: "" }));
+    setForm((f) => ({ ...f, programa: p.nombre, programaTipo: p.tipo_programa ?? tipoProgramaFiltro ?? "", nemonico: p.nemonico ?? "", cohorte: "", fecha_inicio: "" }));
     setOpenProg(false);
     setManualProg(false);
     setCohortes([]);
@@ -277,7 +279,7 @@ export function FacturaUsaForm({ editId, duplicateFromId }: { editId?: string; d
         numero_participantes: isJuridica && form.numero_participantes ? Number(form.numero_participantes) : null,
         participantes: (isAbierta ? participants : []) as unknown as Json,
         lista_cerrada: isJuridica ? form.lista_cerrada : true,
-        tipo_programa: "Factura USA",
+        tipo_programa: form.programaTipo || tipoProgramaFiltro || "Diplomado",
         programa: form.programa,
         nemonico: form.nemonico || null,
         codigo_snies: null,
@@ -286,7 +288,7 @@ export function FacturaUsaForm({ editId, duplicateFromId }: { editId?: string; d
         fecha_inicio: form.fecha_inicio || null,
         fecha_fin: null, horas_programa: null, duracion: null, convocatoria: null,
         periodo,
-        concepto: "Factura USA",
+        concepto: "Matrícula",
         matricula: isAbierta ? valorPorEstudianteNum : valorNum,
         descuento: isAbierta ? (valorPorEstudianteNum - valorTotalPorEstudiante) : descuentoFlat,
         descuento_pct: descuentoPct,

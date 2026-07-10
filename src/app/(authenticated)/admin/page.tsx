@@ -16,6 +16,7 @@ import {
   AlertTriangle, CheckCircle2, XCircle, FileDown, Inbox, Search, Pencil,
   FileText, Trash2, Eye, Copy, Wrench, ArrowLeft,
   Receipt, Globe, Landmark, Wallet, Calendar, X,
+  type LucideIcon,
 } from "lucide-react";
 import { listTemplates, getTemplateDocType, type InvoiceTemplate } from "@/lib/invoice-template";
 import { useLiveRefresh } from "@/lib/use-live-refresh";
@@ -138,6 +139,13 @@ const DOC_TYPE_LABELS: Record<string, string> = {
   factura_usa: "Factura USA",
   factura_colombia: "Factura Colombia",
   factura_paypal: "Factura PayPal",
+};
+
+const DOC_TYPE_ICONS: Record<string, LucideIcon> = {
+  orden_matricula: Receipt,
+  factura_usa: Globe,
+  factura_colombia: Landmark,
+  factura_paypal: Wallet,
 };
 
 const CREATOR_ROLE_LABELS: Record<string, string> = {
@@ -1049,6 +1057,7 @@ export default function AdminPanel() {
               : [];
             const hasCurrentAttachments = (previewing.attachments && previewing.attachments.length > 0) || previewing.approved_pdf_path;
             const hasHistoricalAttachments = historicalAttachments.length > 0;
+            const TypeIcon = DOC_TYPE_ICONS[previewing.document_type ?? ""] ?? FileText;
             return (
               <div className="space-y-3 pb-4">
                 {/* Barra de acciones — arriba, para que se vea de una */}
@@ -1127,8 +1136,17 @@ export default function AdminPanel() {
 
                 {/* Contenido: todas las secciones, sin pestañas */}
                 <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
-                      <div className="p-5 space-y-5">
+                      <div className="p-5 space-y-4">
                         <>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <TypeIcon className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-base font-bold text-foreground">
+                                {DOC_TYPE_LABELS[previewing.document_type ?? ""] ?? previewing.document_type ?? "—"}
+                              </span>
+                              <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-bold", STATUS_PILL[previewing.status])}>
+                                {previewing.status === "pendiente" ? "Pendiente" : previewing.status === "aprobada" ? "Aprobada" : previewing.status === "corregida" ? "Corregida" : "Rechazada"}
+                              </span>
+                            </div>
                             {previewing.document_type === "factura_colombia" && (
                               <DetailSection title="Recuento" noGrid>
                                 <div className="space-y-2">
@@ -1153,7 +1171,7 @@ export default function AdminPanel() {
 
                             <DetailSection title={isPersonaFlow ? "Datos del tercero" : "Datos del estudiante"}>
                               {isPersonaFlow && (
-                                <div className="sm:col-span-2">
+                                <div className="sm:col-span-full">
                                   <span className={cn(
                                     "inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold",
                                     isJuridica ? "bg-indigo-100 text-indigo-700" : "bg-teal-100 text-teal-700",
@@ -1168,7 +1186,7 @@ export default function AdminPanel() {
                                   <PreviewRow label="Número de Identificación" value={previewing.nit ?? previewing.identificacion} />
                                   <PreviewRow label="País" value={previewing.pais ?? "—"} />
                                   <PreviewRow label="Ciudad" value={previewing.ciudad ?? "—"} />
-                                  <div className="sm:col-span-2"><PreviewRow label="Dirección" value={previewing.direccion ?? "—"} /></div>
+                                  <div className="sm:col-span-full"><PreviewRow label="Dirección" value={previewing.direccion ?? "—"} /></div>
                                   {previewing.numero_participantes != null && (
                                     <PreviewRow label="N° de Participantes" value={String(previewing.numero_participantes)} />
                                   )}
@@ -1182,7 +1200,7 @@ export default function AdminPanel() {
                                     <>
                                       <PreviewRow label="País" value={previewing.pais ?? "—"} />
                                       <PreviewRow label="Ciudad" value={previewing.ciudad ?? "—"} />
-                                      <div className="sm:col-span-2"><PreviewRow label="Dirección" value={previewing.direccion ?? "—"} /></div>
+                                      <div className="sm:col-span-full"><PreviewRow label="Dirección" value={previewing.direccion ?? "—"} /></div>
                                     </>
                                   )}
                                 </>
@@ -1218,13 +1236,13 @@ export default function AdminPanel() {
                               <PreviewRow label="Creada" value={formatDate(previewing.created_at)} />
                               {previewing.approved_at && <PreviewRow label="Aprobada" value={formatDate(previewing.approved_at)} />}
                               {previewing.observaciones && (
-                                <div className="sm:col-span-2">
+                                <div className="sm:col-span-full">
                                   <p className="text-xs uppercase tracking-wider text-muted-foreground">Observaciones</p>
                                   <p className="mt-0.5 text-foreground">{previewing.observaciones}</p>
                                 </div>
                               )}
                               {previewing.rejection_reason && (
-                                <div className="sm:col-span-2 rounded-lg bg-destructive/10 px-3 py-2">
+                                <div className="sm:col-span-full rounded-lg bg-destructive/10 px-3 py-2">
                                   <p className="text-xs uppercase tracking-wider text-destructive">⚠️ Motivo de rechazo</p>
                                   <p className="mt-0.5 text-destructive">{previewing.rejection_reason}</p>
                                 </div>
@@ -1234,9 +1252,9 @@ export default function AdminPanel() {
                             <DetailSection title="Programa">
                             <PreviewRow label="Concepto" value={previewing.concepto ?? "—"} />
                             <PreviewRow label="Tipo de programa" value={previewing.tipo_programa ?? "—"} />
-                            <div className="sm:col-span-2"><PreviewRow label="Programa" value={previewing.programa} /></div>
+                            <div className="sm:col-span-full"><PreviewRow label="Programa" value={previewing.programa} /></div>
                             {!isPersonaFlow && previewing.plan_estudio && (
-                              <div className="sm:col-span-2"><PreviewRow label="Nombre del Diplomado" value={previewing.plan_estudio} /></div>
+                              <div className="sm:col-span-full"><PreviewRow label="Nombre del Diplomado" value={previewing.plan_estudio} /></div>
                             )}
                             {!isPersonaFlow && <PreviewRow label="SNIES" value={previewing.codigo_snies ?? "—"} />}
                             {isPersonaFlow && <PreviewRow label="Nemónico" value={previewing.nemonico ?? "—"} />}
