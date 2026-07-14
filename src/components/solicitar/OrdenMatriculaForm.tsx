@@ -218,22 +218,27 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
   };
 
   const isMatriculaParcial = form.concepto_opcion === "Matrícula Parcial";
-  const isPartialActive = isMatriculaParcial && usarValorParcial && Number(form.valor_parcial) > 0;
+  // Para cartera, Matrícula Parcial no usa el checkbox/campo aparte: el propio
+  // campo "Valor (COP)" ES el valor parcial a facturar, sin descuentos.
+  const isCarteraPartial = role === "cartera" && isMatriculaParcial;
+  const isPartialActive = isMatriculaParcial && (isCarteraPartial || (usarValorParcial && Number(form.valor_parcial) > 0));
 
   // "Valor Total" que se muestra en el formulario siempre es el cálculo normal
   // (valor - descuento - bono), sin importar si el valor parcial está activo.
+  // Para cartera en Matrícula Parcial, no hay descuento/bono: el total es el valor tal cual.
   const { valor, descuento, descuentoBono, valorTotal: displayTotal } = useMemo(() => {
     const v = Number(form.valor) || 0;
+    if (isCarteraPartial) return { valor: v, descuento: 0, descuentoBono: 0, valorTotal: v };
     const pct = Math.min(Math.max(Number(form.descuento_pct) || 0, 0), 100);
     const d = Math.round((v * pct) / 100);
     const bono = Math.max(Number(form.descuento_bono) || 0, 0);
     const total = Math.max(v - d - bono, 0);
     return { valor: v, descuento: d, descuentoBono: bono, valorTotal: total };
-  }, [form.valor, form.descuento_pct, form.descuento_bono]);
+  }, [form.valor, form.descuento_pct, form.descuento_bono, isCarteraPartial]);
 
   // Valor que realmente se factura: si el valor parcial está activo, ese es el
   // que manda; si no, es el mismo que se muestra como Valor Total.
-  const valorTotal = isPartialActive ? (Number(form.valor_parcial) || 0) : displayTotal;
+  const valorTotal = isPartialActive ? (isCarteraPartial ? displayTotal : (Number(form.valor_parcial) || 0)) : displayTotal;
 
   const fieldVisible = (key: string) => cfg?.fields?.[key]?.visible !== false;
   const fieldLabel = (key: string, fallback: string) => cfg?.fields?.[key]?.label ?? fallback;
@@ -291,7 +296,7 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
         descuento_bono: isPartialActive ? 0 : descuentoBono,
         valor_total: valorTotal,
         recargo_total: Math.round(valorTotal * 1.1),
-        valor_parcial: isPartialActive ? Number(form.valor_parcial) : null,
+        valor_parcial: isPartialActive ? (isCarteraPartial ? displayTotal : Number(form.valor_parcial)) : null,
         fecha_limite_pago: baseLimite,
         fecha_pago_extraordinario: extra,
         observaciones: form.observaciones || null,
@@ -577,27 +582,36 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
               />
             )}
           </Field>
-          <Field label="Valor (COP) *">
+          <Field label={isCarteraPartial ? "Valor Parcial a Pagar (COP) *" : "Valor (COP) *"}>
             <Input required type="number" min={0} value={form.valor} onChange={(e) => update("valor", e.target.value)} />
+            {isCarteraPartial && (
+              <p className="mt-1 text-xs text-muted-foreground">Este es el valor que finalmente se factura.</p>
+            )}
           </Field>
-          <Field label="Descuento (%)">
-            <Input type="number" min={0} max={100} step="0.01" value={form.descuento_pct} onChange={(e) => update("descuento_pct", e.target.value)} />
-          </Field>
-          <Field label="Descuento Bono (COP)">
-            <Input type="number" min={0} step="1" value={form.descuento_bono} onChange={(e) => update("descuento_bono", e.target.value)} placeholder="0" />
-          </Field>
+          {!isCarteraPartial && (
+            <>
+              <Field label="Descuento (%)">
+                <Input type="number" min={0} max={100} step="0.01" value={form.descuento_pct} onChange={(e) => update("descuento_pct", e.target.value)} />
+              </Field>
+              <Field label="Descuento Bono (COP)">
+                <Input type="number" min={0} step="1" value={form.descuento_bono} onChange={(e) => update("descuento_bono", e.target.value)} placeholder="0" />
+              </Field>
+            </>
+          )}
           <Field label="Valor Total">
             <div className="flex h-9 items-center rounded-md border border-input bg-muted px-3 text-sm font-medium text-foreground">
               {formatCOP(displayTotal)}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {formatCOP(valor)} − {formatCOP(descuento)} (desc.) − {formatCOP(descuentoBono)} (bono)
-            </p>
+            {!isCarteraPartial && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {formatCOP(valor)} − {formatCOP(descuento)} (desc.) − {formatCOP(descuentoBono)} (bono)
+              </p>
+            )}
           </Field>
           <Field label="Fecha Límite de Pago *">
             <Input required type="date" value={form.fecha_limite_pago} onChange={(e) => update("fecha_limite_pago", e.target.value)} />
           </Field>
-          {isMatriculaParcial && (
+          {isMatriculaParcial && !isCarteraPartial && (
             <div className="sm:col-span-2">
               <label className="flex items-center gap-2 text-sm font-medium">
                 <input

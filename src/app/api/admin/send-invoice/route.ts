@@ -101,7 +101,6 @@ export async function POST(request: NextRequest) {
 
   if (!body.comercial_email) return NextResponse.json({ ok: true, skipped: "no comercial_email" });
 
-  const financieraEmail = process.env.FINANCIERA_NOTIFY_EMAIL;
   const kind = body.kind ?? "approved";
 
   if (kind === "rejected") {
@@ -128,15 +127,12 @@ export async function POST(request: NextRequest) {
     } en formato PDF.</p>`,
   });
 
-  const recipients = [body.comercial_email, ...(financieraEmail ? [financieraEmail] : [])];
-  for (const to of recipients) {
-    await sendMailjet({
-      to,
-      subject: `Solicitud aprobada${body.recibo_numero ? ` N° ${body.recibo_numero}` : ""} — ${body.nombre}`,
-      html,
-      ...(body.pdfBase64 ? { attachment: { filename, contentBase64: body.pdfBase64, mimeType: "application/pdf" } } : {}),
-    });
-  }
+  await sendMailjet({
+    to: body.comercial_email,
+    subject: `Solicitud aprobada${body.recibo_numero ? ` N° ${body.recibo_numero}` : ""} — ${body.nombre}`,
+    html,
+    ...(body.pdfBase64 ? { attachment: { filename, contentBase64: body.pdfBase64, mimeType: "application/pdf" } } : {}),
+  });
 
   return NextResponse.json({ ok: true });
 }
