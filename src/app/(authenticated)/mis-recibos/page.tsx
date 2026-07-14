@@ -709,7 +709,12 @@ export default function MisRecibos() {
                             <DetailSection title="Programa">
                             <PreviewRow label="Concepto" value={previewing.concepto ?? "—"} />
                             <PreviewRow label="Tipo de programa" value={previewing.tipo_programa ?? "—"} />
-                            <div className="sm:col-span-full"><PreviewRow label="Programa" value={previewing.programa} /></div>
+                            <div className="sm:col-span-full">
+                              <PreviewRow
+                                label="Programa"
+                                value={!isPersonaFlow ? (previewing.nemonico || previewing.programa) : previewing.programa}
+                              />
+                            </div>
                             {!isPersonaFlow && previewing.plan_estudio && (
                               <div className="sm:col-span-full"><PreviewRow label="Nombre del Diplomado" value={previewing.plan_estudio} /></div>
                             )}
