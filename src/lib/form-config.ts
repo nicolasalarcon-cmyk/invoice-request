@@ -39,18 +39,3 @@ export async function getFormConfig(): Promise<FormConfig> {
   return cached;
 }
 
-export async function saveFormConfig(config: FormConfig): Promise<void> {
-  const { data: existing } = await supabase.from("form_config").select("id").limit(1).maybeSingle();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const payload = config as any;
-  if (existing) {
-    await supabase.from("form_config").update({ config: payload, updated_at: new Date().toISOString() }).eq("id", existing.id);
-  } else {
-    await supabase.from("form_config").insert({ config: payload });
-  }
-  cached = config;
-}
-
-export function clearFormConfigCache() {
-  cached = null;
-}
