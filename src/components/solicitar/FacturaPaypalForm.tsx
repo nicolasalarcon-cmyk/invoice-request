@@ -424,6 +424,11 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
               <Field label="Número de Identificación">
                 <Input maxLength={50} value={form.nit} onChange={(e) => update("nit", e.target.value.replace(/[^\d-]/g, ""))} />
               </Field>
+              {role === "cartera" && (
+                <Field label="N° de Inscripción *">
+                  <Input required maxLength={100} value={form.numero_inscripcion} onChange={(e) => update("numero_inscripcion", e.target.value)} />
+                </Field>
+              )}
               <Field label="Correo Electrónico">
                 <Input type="email" maxLength={200} value={form.email_empresa} onChange={(e) => update("email_empresa", e.target.value)} />
               </Field>
