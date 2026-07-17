@@ -95,6 +95,7 @@ interface Req {
   concepto: string | null;
   periodo: string;
   matricula: number;
+  descuento: number;
   descuento_pct: number;
   descuento_bono: number;
   valor_total: number;
@@ -227,6 +228,7 @@ export default function MisRecibos() {
       duracion: r.duracion,
       convocatoria: r.convocatoria,
       matricula: Number(r.matricula),
+      descuento: Number(r.descuento ?? 0),
       descuento_pct: Number(r.descuento_pct ?? 0),
       descuento_bono: Number(r.descuento_bono ?? 0),
       valor_total: Number(r.valor_total ?? 0),
@@ -734,6 +736,9 @@ export default function MisRecibos() {
                             {previewing.valor_parcial != null ? (
                               <>
                                 <PreviewRow label="Valor de matrícula" value={formatCOP(previewing.matricula)} />
+                                <PreviewRow label="Descuento %" value={`${previewing.descuento_pct}%`} />
+                                <PreviewRow label="Descuento bono" value={formatCOP(previewing.descuento_bono ?? 0)} />
+                                <PreviewRow label="Valor Total" value={formatCOP(previewing.matricula - previewing.descuento - (previewing.descuento_bono ?? 0))} />
                                 <PreviewRow label="Valor parcial a facturar" value={formatCOP(previewing.valor_parcial)} />
                               </>
                             ) : (

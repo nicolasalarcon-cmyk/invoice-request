@@ -292,8 +292,12 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
         concepto: conceptoFinal,
         matricula: valor,
         descuento,
-        descuento_pct: isPartialActive ? 0 : (Number(form.descuento_pct) || 0),
-        descuento_bono: isPartialActive ? 0 : descuentoBono,
+        // Se guardan siempre los valores reales de descuento (aunque el valor
+        // parcial sea el que finalmente se factura), para que financiera pueda
+        // ver cuánto descuento se aplicó. El PDF los ignora cuando hay valor
+        // parcial, así que esto no afecta la factura.
+        descuento_pct: Number(form.descuento_pct) || 0,
+        descuento_bono: descuentoBono,
         valor_total: valorTotal,
         recargo_total: Math.round(valorTotal * 1.1),
         valor_parcial: isPartialActive ? (isCarteraPartial ? displayTotal : Number(form.valor_parcial)) : null,
@@ -393,22 +397,24 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
         </div>
       </Section>
 
-      <Section title="Asignar Asesor">
-        <Field label={role === "comercial" ? "Asesor Comercial *" : "Asesor Comercial"}>
-          <Select
-            value={form.asesor_nombre || "__none__"}
-            onValueChange={(v) => update("asesor_nombre", v === "__none__" ? "" : v)}
-          >
-            <SelectTrigger><SelectValue placeholder="Selecciona el asesor" /></SelectTrigger>
-            <SelectContent>
-              {role !== "comercial" && <SelectItem value="__none__">Sin asignar</SelectItem>}
-              {asesorOptions.map((a) => (
-                <SelectItem key={a.id} value={a.nombre}>{a.nombre}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-      </Section>
+      {role !== "cartera" && (
+        <Section title="Asignar Asesor">
+          <Field label={role === "comercial" ? "Asesor Comercial *" : "Asesor Comercial"}>
+            <Select
+              value={form.asesor_nombre || "__none__"}
+              onValueChange={(v) => update("asesor_nombre", v === "__none__" ? "" : v)}
+            >
+              <SelectTrigger><SelectValue placeholder="Selecciona el asesor" /></SelectTrigger>
+              <SelectContent>
+                {role !== "comercial" && <SelectItem value="__none__">Sin asignar</SelectItem>}
+                {asesorOptions.map((a) => (
+                  <SelectItem key={a.id} value={a.nombre}>{a.nombre}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        </Section>
+      )}
 
       <Section title="Datos del estudiante">
         <div className="grid gap-4 sm:grid-cols-2">
@@ -583,7 +589,17 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
             )}
           </Field>
           <Field label={isCarteraPartial ? "Valor Parcial a Pagar (COP) *" : "Valor (COP) *"}>
-            <Input required type="number" min={0} value={form.valor} onChange={(e) => update("valor", e.target.value)} />
+            {isCarteraPartial ? (
+              <Input
+                required
+                type="text"
+                inputMode="numeric"
+                value={form.valor ? Number(form.valor).toLocaleString("es-CO") : ""}
+                onChange={(e) => update("valor", e.target.value.replace(/\D/g, ""))}
+              />
+            ) : (
+              <Input required type="number" min={0} value={form.valor} onChange={(e) => update("valor", e.target.value)} />
+            )}
             {isCarteraPartial && (
               <p className="mt-1 text-xs text-muted-foreground">Este es el valor que finalmente se factura.</p>
             )}
@@ -627,10 +643,10 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
                   <Input
                     className="mt-2 max-w-xs"
                     required
-                    type="number"
-                    min={0}
-                    value={form.valor_parcial}
-                    onChange={(e) => update("valor_parcial", e.target.value)}
+                    type="text"
+                    inputMode="numeric"
+                    value={form.valor_parcial ? Number(form.valor_parcial).toLocaleString("es-CO") : ""}
+                    onChange={(e) => update("valor_parcial", e.target.value.replace(/\D/g, ""))}
                     placeholder="Valor Parcial a Facturar (COP)"
                   />
                   <p className="mt-1 text-xs text-muted-foreground">Este valor es el que finalmente se factura, en vez del Valor Total.</p>

@@ -389,22 +389,24 @@ export function FacturaUsaForm({ editId, duplicateFromId }: { editId?: string; d
         </div>
       </Section>
 
-      <Section title="Asignar Asesor">
-        <Field label={role === "comercial" ? "Asesor Comercial *" : "Asesor Comercial"}>
-          <Select
-            value={form.asesor_nombre || "__none__"}
-            onValueChange={(v) => update("asesor_nombre", v === "__none__" ? "" : v)}
-          >
-            <SelectTrigger><SelectValue placeholder="Selecciona el asesor" /></SelectTrigger>
-            <SelectContent>
-              {role !== "comercial" && <SelectItem value="__none__">Sin asignar</SelectItem>}
-              {asesorOptions.map((a) => (
-                <SelectItem key={a.id} value={a.nombre}>{a.nombre}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-      </Section>
+      {role !== "cartera" && (
+        <Section title="Asignar Asesor">
+          <Field label={role === "comercial" ? "Asesor Comercial *" : "Asesor Comercial"}>
+            <Select
+              value={form.asesor_nombre || "__none__"}
+              onValueChange={(v) => update("asesor_nombre", v === "__none__" ? "" : v)}
+            >
+              <SelectTrigger><SelectValue placeholder="Selecciona el asesor" /></SelectTrigger>
+              <SelectContent>
+                {role !== "comercial" && <SelectItem value="__none__">Sin asignar</SelectItem>}
+                {asesorOptions.map((a) => (
+                  <SelectItem key={a.id} value={a.nombre}>{a.nombre}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        </Section>
+      )}
 
       {/* ── TIPO DE PERSONA ── */}
       <Section title="Tipo de persona">
