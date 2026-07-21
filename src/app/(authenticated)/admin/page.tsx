@@ -867,7 +867,11 @@ export default function AdminPanel() {
                         <span className="text-muted-foreground/40">•</span>
                         <span>ID {r.identificacion}</span>
                         <span className="text-muted-foreground/40">•</span>
-                        <span className="truncate">{r.concepto ?? "Matrícula"} · {r.tipo_programa ?? ""} {r.programa}</span>
+                        <span className="truncate">{r.concepto ?? "Matrícula"}</span>
+                        <span className="text-muted-foreground/40">•</span>
+                        <span className="truncate">{r.comercial_nombre ?? "—"}</span>
+                        <span className="text-muted-foreground/40">•</span>
+                        <span>{formatDate(r.created_at)}</span>
                       </div>
                       {r.status === "rechazada" && r.rejection_reason && (
                         <p className="w-fit rounded-lg border border-rose-100/60 bg-rose-50/50 px-2.5 py-1 text-sm font-medium text-rose-600">
