@@ -109,6 +109,7 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           approved_pdf_path: string | null
+          approved_pdf_name: string | null
           archived_by_comercial: boolean
           archived_by_reviewer: boolean
           asesor_nombre: string | null
@@ -175,6 +176,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           approved_pdf_path?: string | null
+          approved_pdf_name?: string | null
           archived_by_comercial?: boolean
           archived_by_reviewer?: boolean
           asesor_nombre?: string | null
@@ -241,6 +243,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           approved_pdf_path?: string | null
+          approved_pdf_name?: string | null
           archived_by_comercial?: boolean
           archived_by_reviewer?: boolean
           asesor_nombre?: string | null

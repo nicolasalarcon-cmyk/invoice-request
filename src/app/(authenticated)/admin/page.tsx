@@ -11,7 +11,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { formatCOP, formatDate } from "@/lib/format";
+import { formatCOP, formatDate, formatDateTime } from "@/lib/format";
 import {
   AlertTriangle, CheckCircle2, XCircle, FileDown, Inbox, Search, Pencil,
   FileText, Trash2, Eye, Copy, Wrench, ArrowLeft,
@@ -103,6 +103,7 @@ interface Req {
   parent_id: string | null;
   attachments: AttachmentItem[] | null;
   approved_pdf_path: string | null;
+  approved_pdf_name: string | null;
   archived_by_comercial: boolean;
   archived_by_reviewer: boolean;
   created_by: string | null;
@@ -408,13 +409,23 @@ export default function AdminPanel() {
     if (!r.parent_id) return;
     const parent = itemsById.get(r.parent_id);
     if (!parent) return;
+    // Al corregir una solicitud ya aprobada, los adjuntos que no se
+    // reemplazan quedan cargados con la MISMA ruta de Storage que el
+    // "padre". Si se borraran igual, la solicitud corregida (ya vigente)
+    // se quedaría con referencias a archivos que ya no existen. Por eso
+    // solo se borran las rutas del padre que el hijo ya no usa.
+    const childPaths = new Set([
+      ...(r.attachments ?? []).map((a) => a.path),
+      ...(r.approved_pdf_path ? [r.approved_pdf_path] : []),
+    ]);
     const paths = [
       ...(parent.attachments ?? []).map((a) => a.path),
       ...(parent.approved_pdf_path ? [parent.approved_pdf_path] : []),
-    ];
-    if (paths.length === 0) return;
-    await supabase.storage.from("invoice-files").remove(paths).catch(() => {});
-    await supabase.from("invoice_requests").update({ attachments: [], approved_pdf_path: null }).eq("id", parent.id);
+    ].filter((p) => !childPaths.has(p));
+    if (paths.length > 0) {
+      await supabase.storage.from("invoice-files").remove(paths).catch(() => {});
+    }
+    await supabase.from("invoice_requests").update({ attachments: [], approved_pdf_path: null, approved_pdf_name: null }).eq("id", parent.id);
   };
 
   const confirmApproveUpload = async () => {
@@ -471,7 +482,7 @@ export default function AdminPanel() {
           approved_by: user?.id,
           approved_at: new Date().toISOString(),
           recibo_numero: reciboNumero,
-          ...(pdfPath ? { approved_pdf_path: pdfPath } : {}),
+          ...(pdfPath ? { approved_pdf_path: pdfPath, approved_pdf_name: approvalPdf!.name } : {}),
           ...(uploadedNoteImages.length > 0 ? { attachments: [...(r.attachments ?? []), ...uploadedNoteImages] as any } : {}),
           ...(notesText ? { observaciones: [r.observaciones, `📎 Nota de aprobación (PayPal): ${notesText}`].filter(Boolean).join("\n\n") } : {}),
         })
@@ -871,7 +882,7 @@ export default function AdminPanel() {
                         <span className="text-muted-foreground/40">•</span>
                         <span className="truncate">{r.comercial_nombre ?? "—"}</span>
                         <span className="text-muted-foreground/40">•</span>
-                        <span>{formatDate(r.created_at)}</span>
+                        <span>{formatDateTime(r.created_at)}</span>
                       </div>
                       {r.status === "rechazada" && r.rejection_reason && (
                         <p className="w-fit rounded-lg border border-rose-100/60 bg-rose-50/50 px-2.5 py-1 text-sm font-medium text-rose-600">

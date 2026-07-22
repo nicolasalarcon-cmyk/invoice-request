@@ -42,6 +42,9 @@ env
 # Lovable platform metadata
 .lovable/
 
+# Backups locales de adjuntos (datos sensibles — nunca a git)
+/backups/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

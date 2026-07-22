@@ -21,3 +21,20 @@ export const formatDate = (d: string | Date | null | undefined): string => {
     year: "numeric",
   }).format(date);
 };
+
+/** Igual que formatDate, pero además incluye la hora — para timestamps como created_at. */
+export const formatDateTime = (d: string | Date | null | undefined): string => {
+  if (!d) return "—";
+  const date = typeof d === "string" ? new Date(d) : d;
+  const datePart = new Intl.DateTimeFormat("es-CO", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(date);
+  const timePart = new Intl.DateTimeFormat("es-CO", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
+  return `${datePart}, ${timePart}`;
+};
