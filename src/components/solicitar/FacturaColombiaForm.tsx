@@ -28,6 +28,7 @@ const SECTION_TITLE_BY_ROLE: Record<string, string> = {
   admin: "Datos de Administrador",
   financiera: "Datos de Financiera",
   cartera: "Datos de Cartera",
+  mini_financiera: "Datos de Mini Financiera",
   comercial: "Datos del Líder Comercial",
 };
 
@@ -70,6 +71,7 @@ interface CoForm {
   descuento_pct: string;
   fecha_limite_pago: string;
   observaciones: string;
+  pago_aplicado: boolean;
 }
 
 const EMPTY: CoForm = {
@@ -81,6 +83,7 @@ const EMPTY: CoForm = {
   lista_cerrada: true, valor_por_estudiante: "",
   programa: "", programaTipo: "", nemonico: "", cohorte: "", fecha_inicio: "",
   valor: "", descuento_pct: "0", fecha_limite_pago: "", observaciones: "",
+  pago_aplicado: false,
 };
 
 export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: string; duplicateFromId?: string }) {
@@ -162,6 +165,7 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
       descuento_pct: String(data.descuento_pct ?? 0),
       fecha_limite_pago: data.fecha_limite_pago ?? "",
       observaciones: data.observaciones ?? "",
+      pago_aplicado: (d.pago_aplicado as boolean | null) ?? false,
     });
   };
 
@@ -289,6 +293,7 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
         recargo_total: isAbierta ? valorTotalEmpresa : computedTotal,
         fecha_limite_pago: form.fecha_limite_pago,
         observaciones: form.observaciones || null,
+        pago_aplicado: role === "cartera" ? form.pago_aplicado : false,
         attachments,
       };
 
@@ -655,6 +660,24 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
                     <Input required type="date" value={form.fecha_limite_pago} onChange={(e) => update("fecha_limite_pago", e.target.value)} />
                   </Field>
                 </>
+              )}
+              {role === "cartera" && (
+                <div className="sm:col-span-2">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4"
+                      checked={form.pago_aplicado}
+                      onChange={(e) => update("pago_aplicado", e.target.checked)}
+                    />
+                    Requiere validación de pago
+                  </label>
+                  {form.pago_aplicado && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      No olvides adjuntar los soportes de pago en la sección de Adjuntos, más abajo.
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           </Section>

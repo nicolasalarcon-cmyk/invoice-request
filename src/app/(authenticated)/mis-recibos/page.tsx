@@ -8,7 +8,7 @@ import { useLiveRefresh } from "@/lib/use-live-refresh";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { formatCOP, formatDate } from "@/lib/format";
+import { formatCOP, formatDate, formatDateTime } from "@/lib/format";
 import {
   FileDown, Inbox, Search, Pencil, Trash2, Copy, Wrench, Eye, ArrowLeft,
   Receipt, Globe, Landmark, Wallet, FileText,
@@ -686,28 +686,6 @@ export default function MisRecibos() {
                               </DetailSection>
                             )}
 
-                            <DetailSection title="Estado y seguimiento">
-                              <PreviewRow label="Líder Comercial" value={previewing.comercial_nombre ?? "—"} />
-                              <PreviewRow label="Correo Líder Comercial" value={previewing.comercial_email ?? "—"} />
-                              {previewing.asesor_nombre && (
-                                <PreviewRow label="Asesor Comercial" value={previewing.asesor_nombre} />
-                              )}
-                              <PreviewRow label="Creada" value={formatDate(previewing.created_at)} />
-                              {previewing.approved_at && <PreviewRow label="Aprobada" value={formatDate(previewing.approved_at)} />}
-                              {previewing.observaciones && (
-                                <div className="sm:col-span-full">
-                                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Observaciones</p>
-                                  <p className="mt-0.5 text-foreground">{previewing.observaciones}</p>
-                                </div>
-                              )}
-                              {previewing.rejection_reason && (
-                                <div className="sm:col-span-full rounded-lg bg-destructive/10 px-3 py-2">
-                                  <p className="text-xs uppercase tracking-wider text-destructive">⚠️ Motivo de rechazo</p>
-                                  <p className="mt-0.5 text-destructive">{previewing.rejection_reason}</p>
-                                </div>
-                              )}
-                            </DetailSection>
-
                             <DetailSection title="Programa">
                             <PreviewRow label="Concepto" value={previewing.concepto ?? "—"} />
                             <PreviewRow label="Tipo de programa" value={previewing.tipo_programa ?? "—"} />
@@ -789,6 +767,28 @@ export default function MisRecibos() {
                               </div>
                             </DetailSection>
                           ))}
+
+                            <DetailSection title="Estado y seguimiento">
+                              <PreviewRow label="Líder Comercial" value={previewing.comercial_nombre ?? "—"} />
+                              <PreviewRow label="Correo Líder Comercial" value={previewing.comercial_email ?? "—"} />
+                              {previewing.asesor_nombre && (
+                                <PreviewRow label="Asesor Comercial" value={previewing.asesor_nombre} />
+                              )}
+                              <PreviewRow label="Creada" value={formatDateTime(previewing.created_at)} />
+                              {previewing.approved_at && <PreviewRow label="Aprobada" value={formatDate(previewing.approved_at)} />}
+                              {previewing.observaciones && (
+                                <div className="sm:col-span-full">
+                                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Observaciones</p>
+                                  <p className="mt-0.5 text-foreground">{previewing.observaciones}</p>
+                                </div>
+                              )}
+                              {previewing.rejection_reason && (
+                                <div className="sm:col-span-full rounded-lg bg-destructive/10 px-3 py-2">
+                                  <p className="text-xs uppercase tracking-wider text-destructive">⚠️ Motivo de rechazo</p>
+                                  <p className="mt-0.5 text-destructive">{previewing.rejection_reason}</p>
+                                </div>
+                              )}
+                            </DetailSection>
                         </>
                       </div>
                 </div>

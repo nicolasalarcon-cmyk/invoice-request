@@ -24,7 +24,7 @@ export async function PUT(
   if (!adminUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
-  const body = await request.json() as { action: "password" | "role"; password?: string; role?: "super_admin" | "admin" | "financiera" | "cartera" | "comercial" };
+  const body = await request.json() as { action: "password" | "role"; password?: string; role?: "super_admin" | "admin" | "financiera" | "cartera" | "mini_financiera" | "comercial" };
 
   if (body.action === "password") {
     if (!body.password) return NextResponse.json({ error: "Missing password" }, { status: 400 });

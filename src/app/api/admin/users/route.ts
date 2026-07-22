@@ -45,7 +45,8 @@ export async function POST(request: NextRequest) {
   if (!adminUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json() as {
-    email: string; password: string; nombre: string; role: "admin" | "comercial";
+    email: string; password: string; nombre: string;
+    role: "super_admin" | "admin" | "financiera" | "cartera" | "mini_financiera" | "comercial";
   };
 
   const { data: created, error } = await supabaseAdmin.auth.admin.createUser({

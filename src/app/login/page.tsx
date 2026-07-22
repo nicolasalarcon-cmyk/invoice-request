@@ -24,7 +24,7 @@ export default function LoginPage() {
       .eq("user_id", u.user.id);
     const list = (roles ?? []).map((r) => r.role as string);
     const canViewAllRequests = list.some((r) =>
-      ["super_admin", "admin", "financiera", "cartera"].includes(r),
+      ["super_admin", "admin", "financiera", "cartera", "mini_financiera"].includes(r),
     );
     if (canViewAllRequests) router.replace("/admin");
     else router.replace("/mis-recibos");

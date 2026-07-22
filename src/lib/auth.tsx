@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
-export type AppRole = "super_admin" | "admin" | "financiera" | "cartera" | "comercial" | "user";
+export type AppRole = "super_admin" | "admin" | "financiera" | "cartera" | "mini_financiera" | "comercial" | "user";
 
 interface Profile {
   nombre_completo: string | null;
@@ -40,8 +40,8 @@ export function useAuth() {
             ]);
             if (!mounted) return;
             const list = (roles ?? []).map((r) => r.role as AppRole);
-            // Priority: super_admin > admin > financiera > cartera > comercial > user
-            const priority: AppRole[] = ["super_admin", "admin", "financiera", "cartera", "comercial", "user"];
+            // Priority: super_admin > admin > financiera > cartera > mini_financiera > comercial > user
+            const priority: AppRole[] = ["super_admin", "admin", "financiera", "cartera", "mini_financiera", "comercial", "user"];
             const resolved = priority.find((r) => list.includes(r)) ?? null;
             setRole(resolved);
             setProfile(prof ?? { nombre_completo: s.user.email ?? null, email: s.user.email ?? null });
@@ -86,20 +86,25 @@ export function useAuth() {
   const canApprove      = role === "super_admin" || role === "admin" || role === "financiera";
   const canDelete       = role === "super_admin" || role === "admin";
   const canManageUsers  = role === "super_admin";
+  // Mini Financiera solo tiene la Bandeja — sin Dashboard, Numeración ni Crear.
   const canViewDashboard     = role === "super_admin" || role === "admin" || role === "financiera";
   const canViewNumeracion    = role === "super_admin" || role === "admin" || role === "financiera" || role === "cartera";
   const canManageTemplates   = role === "super_admin" || role === "admin";
   const canManagePrograms    = role === "super_admin" || role === "admin";
-  const canViewAllRequests   = role === "super_admin" || role === "admin" || role === "financiera" || role === "cartera";
+  const canViewAllRequests   = role === "super_admin" || role === "admin" || role === "financiera" || role === "cartera" || role === "mini_financiera";
   const isCartera       = role === "cartera";
+  const isMiniFinanciera = role === "mini_financiera";
+  // Quiénes pueden marcar el sub-estado de Gestión de Pago (Aplicado/No Aplicado):
+  // exclusivo de Mini Financiera, Admin y SuperAdmin.
+  const canGestionarPago = role === "super_admin" || role === "admin" || role === "mini_financiera";
   const isComercial     = role !== null; // todos pueden crear solicitudes
 
   return {
     session, user, role, profile, loading,
-    isAdmin, isComercial, isCartera,
+    isAdmin, isComercial, isCartera, isMiniFinanciera,
     canApprove, canDelete, canManageUsers,
     canViewDashboard, canViewNumeracion,
     canManageTemplates, canManagePrograms,
-    canViewAllRequests,
+    canViewAllRequests, canGestionarPago,
   };
 }

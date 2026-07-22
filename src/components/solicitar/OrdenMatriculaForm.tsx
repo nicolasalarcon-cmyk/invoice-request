@@ -30,6 +30,7 @@ const SECTION_TITLE_BY_ROLE: Record<string, string> = {
   admin: "Datos de Administrador",
   financiera: "Datos de Financiera",
   cartera: "Datos de Cartera",
+  mini_financiera: "Datos de Mini Financiera",
   comercial: "Datos del Líder Comercial",
 };
 

@@ -149,9 +149,15 @@ export type Database = {
           numero_inscripcion: string | null
           numero_participantes: number | null
           observaciones: string | null
+          pago_aplicado: boolean
           pais: string | null
           participantes: Json
           parent_id: string | null
+          gestion_pago: string | null
+          gestion_pago_nota: string | null
+          gestion_pago_adjuntos: Json
+          gestion_pago_at: string | null
+          gestion_pago_by: string | null
           periodo: string
           plan_estudio: string | null
           programa: string
@@ -216,9 +222,15 @@ export type Database = {
           numero_inscripcion?: string | null
           numero_participantes?: number | null
           observaciones?: string | null
+          pago_aplicado?: boolean
           pais?: string | null
           participantes?: Json
           parent_id?: string | null
+          gestion_pago?: string | null
+          gestion_pago_nota?: string | null
+          gestion_pago_adjuntos?: Json
+          gestion_pago_at?: string | null
+          gestion_pago_by?: string | null
           periodo?: string
           plan_estudio?: string | null
           programa?: string
@@ -283,9 +295,15 @@ export type Database = {
           numero_inscripcion?: string | null
           numero_participantes?: number | null
           observaciones?: string | null
+          pago_aplicado?: boolean
           pais?: string | null
           participantes?: Json
           parent_id?: string | null
+          gestion_pago?: string | null
+          gestion_pago_nota?: string | null
+          gestion_pago_adjuntos?: Json
+          gestion_pago_at?: string | null
+          gestion_pago_by?: string | null
           periodo?: string
           plan_estudio?: string | null
           programa?: string
@@ -493,7 +511,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "super_admin" | "admin" | "financiera" | "cartera" | "comercial" | "user"
+      app_role: "super_admin" | "admin" | "financiera" | "cartera" | "mini_financiera" | "comercial" | "user"
       invoice_status: "pendiente" | "aprobada" | "rechazada" | "requiere_info" | "corregida"
     }
     CompositeTypes: {
@@ -622,7 +640,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["super_admin", "admin", "financiera", "cartera", "comercial", "user"],
+      app_role: ["super_admin", "admin", "financiera", "cartera", "mini_financiera", "comercial", "user"],
       invoice_status: ["pendiente", "aprobada", "rechazada", "requiere_info", "corregida"],
     },
   },

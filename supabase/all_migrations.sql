@@ -826,3 +826,74 @@ CREATE POLICY "invoice_files_scoped_read" ON storage.objects
 -- cambio no se pueden recuperar retroactivamente (el dato nunca se guardó).
 ALTER TABLE public.invoice_requests
   ADD COLUMN IF NOT EXISTS approved_pdf_name text;
+
+
+-- ==================== 20260722090000_add_mini_financiera_role ====================
+-- PASO 1 de 3 — correr ESTE archivo solo, en su propia ejecución en el
+-- SQL Editor de Supabase, antes de correr los otros dos.
+--
+-- Agrega el valor 'mini_financiera' al enum app_role, igual que ya se
+-- hizo antes con 'financiera' y 'cartera'. Postgres no permite usar un
+-- valor de enum recién agregado en la misma transacción en la que se
+-- agregó, por eso este paso va separado y debe ejecutarse (y confirmarse)
+-- antes de correr 20260722100000_gestion_pago.sql y
+-- 20260722110000_mini_financiera_rls.sql.
+
+ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'mini_financiera';
+
+
+-- ==================== 20260722100000_gestion_pago ====================
+-- PASO 2 de 3 — correr DESPUÉS de 20260722090000_add_mini_financiera_role.sql.
+--
+-- Feature "Gestión de Pago" / rol Mini Financiera.
+--
+-- pago_aplicado: checkbox que Cartera marca al CREAR una Factura USA/
+-- Colombia/PayPal (vacío por defecto). Es la puerta de visibilidad: Mini
+-- Financiera solo ve las solicitudes donde este campo está en true.
+--
+-- gestion_pago / gestion_pago_nota / gestion_pago_adjuntos / gestion_pago_at
+-- / gestion_pago_by: el "segundo estado", que Mini Financiera (o Cartera o
+-- Financiera) define DESPUÉS, desde el detalle, con dos botones tipo
+-- Aprobar/Rechazar ("Pago Aplicado" / "Pago NO Aplicado"). No es lo mismo
+-- que el estado principal de la solicitud (pendiente/aprobada/rechazada) y
+-- NO dispara correo. Nota y adjuntos son opcionales, solo de soporte.
+
+ALTER TABLE public.invoice_requests
+  ADD COLUMN IF NOT EXISTS pago_aplicado boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS gestion_pago text,
+  ADD COLUMN IF NOT EXISTS gestion_pago_nota text,
+  ADD COLUMN IF NOT EXISTS gestion_pago_adjuntos jsonb NOT NULL DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS gestion_pago_at timestamptz,
+  ADD COLUMN IF NOT EXISTS gestion_pago_by uuid;
+
+ALTER TABLE public.invoice_requests
+  DROP CONSTRAINT IF EXISTS invoice_requests_gestion_pago_check;
+ALTER TABLE public.invoice_requests
+  ADD CONSTRAINT invoice_requests_gestion_pago_check
+  CHECK (gestion_pago IS NULL OR gestion_pago IN ('aplicado', 'no_aplicado'));
+
+
+-- ==================== 20260722110000_mini_financiera_rls ====================
+-- PASO 3 de 3 — correr al final, después de los otros dos archivos.
+--
+-- Acceso de Mini Financiera: solo puede ver y actualizar (para el botón de
+-- Gestión de Pago) las solicitudes que Cartera marcó con pago_aplicado = true.
+--
+-- Nota: no pude verificar desde el repositorio cómo quedaron exactamente
+-- las políticas actuales de financiera/cartera (parecen haberse creado a
+-- mano en el Dashboard, no quedaron en ninguna migración rastreable). Esta
+-- política es ADITIVA — no reemplaza ni toca ninguna política existente,
+-- solo agrega acceso nuevo para el rol nuevo. Si algo no se ve como se
+-- espera, probablemente haga falta revisar las políticas ya existentes
+-- directamente en Supabase.
+
+DROP POLICY IF EXISTS "Mini financiera ve solo pagos aplicados" ON public.invoice_requests;
+CREATE POLICY "Mini financiera ve solo pagos aplicados"
+ON public.invoice_requests FOR SELECT TO authenticated
+USING (has_role(auth.uid(), 'mini_financiera'::app_role) AND pago_aplicado = true);
+
+DROP POLICY IF EXISTS "Mini financiera puede gestionar pago" ON public.invoice_requests;
+CREATE POLICY "Mini financiera puede gestionar pago"
+ON public.invoice_requests FOR UPDATE TO authenticated
+USING (has_role(auth.uid(), 'mini_financiera'::app_role) AND pago_aplicado = true)
+WITH CHECK (has_role(auth.uid(), 'mini_financiera'::app_role) AND pago_aplicado = true);

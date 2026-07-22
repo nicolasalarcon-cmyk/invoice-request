@@ -104,6 +104,12 @@ interface Req {
   attachments: AttachmentItem[] | null;
   approved_pdf_path: string | null;
   approved_pdf_name: string | null;
+  pago_aplicado: boolean;
+  gestion_pago: string | null;
+  gestion_pago_nota: string | null;
+  gestion_pago_adjuntos: AttachmentItem[] | null;
+  gestion_pago_at: string | null;
+  gestion_pago_by: string | null;
   archived_by_comercial: boolean;
   archived_by_reviewer: boolean;
   created_by: string | null;
@@ -142,6 +148,9 @@ const DOC_TYPE_LABELS: Record<string, string> = {
   factura_paypal: "Factura PayPal",
 };
 
+// Tipos de documento donde aplica el flujo de Gestión de Pago / Mini Financiera.
+const GESTION_PAGO_DOC_TYPES = ["factura_usa", "factura_colombia", "factura_paypal"];
+
 const DOC_TYPE_ICONS: Record<string, LucideIcon> = {
   orden_matricula: Receipt,
   factura_usa: Globe,
@@ -154,6 +163,7 @@ const CREATOR_ROLE_LABELS: Record<string, string> = {
   admin: "Administrador",
   financiera: "Financiera",
   cartera: "Cartera",
+  mini_financiera: "Mini Financiera",
   comercial: "Líder Comercial",
 };
 
@@ -184,12 +194,13 @@ async function sendInvoiceEmail(data: {
 }
 
 export default function AdminPanel() {
-  const { user, role, isCartera, canApprove, canDelete, canViewAllRequests, loading: authLoading } = useAuth();
+  const { user, role, isCartera, isMiniFinanciera, canApprove, canDelete, canViewAllRequests, canGestionarPago, loading: authLoading } = useAuth();
   const [items, setItems] = useState<Req[]>([]);
   const [templates, setTemplates] = useState<InvoiceTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | Status>("all");
+  const [gestionFilter, setGestionFilter] = useState<"all" | "pendiente" | "aplicado" | "no_aplicado">("all");
   const [tipoFilter, setTipoFilter] = useState<"all" | DocType>("all");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [approving, setApproving] = useState<Req | null>(null);
@@ -201,6 +212,10 @@ export default function AdminPanel() {
   const [rejecting, setRejecting] = useState<Req | null>(null);
   const [rejectCategory, setRejectCategory] = useState("");
   const [rejectOtherText, setRejectOtherText] = useState("");
+  const [gestionandoPago, setGestionandoPago] = useState<{ r: Req; kind: "aplicado" | "no_aplicado" } | null>(null);
+  const [gestionPagoNota, setGestionPagoNota] = useState("");
+  const [gestionPagoFile, setGestionPagoFile] = useState<File | null>(null);
+  const [gestionPagoBusy, setGestionPagoBusy] = useState(false);
   const [previewing, setPreviewing] = useState<Req | null>(null);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [pdfPreviewName, setPdfPreviewName] = useState("");
@@ -226,9 +241,10 @@ export default function AdminPanel() {
   useEffect(() => { if (canViewAllRequests) load(); }, [canViewAllRequests]);
 
   useEffect(() => {
-    const handler = () => setPreviewing(null);
+    const handler = () => { setPreviewing(null); load(); };
     window.addEventListener("app:reset-inbox", handler);
     return () => window.removeEventListener("app:reset-inbox", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useLiveRefresh("invoice_requests_inbox", () => load(true), canViewAllRequests);
@@ -270,9 +286,12 @@ export default function AdminPanel() {
   const visibleForRole = useMemo(() => {
     const s = q.toLowerCase().trim();
     return items.filter((r) => {
-      // "Eliminar" de Financiera/Cartera solo oculta de su propia vista,
-      // no afecta lo que ve Admin/SuperAdmin.
-      if (r.archived_by_reviewer && (role === "financiera" || role === "cartera")) return false;
+      // "Eliminar" de Financiera/Cartera/Mini Financiera solo oculta de su
+      // propia vista, no afecta lo que ve Admin/SuperAdmin.
+      if (r.archived_by_reviewer && (role === "financiera" || role === "cartera" || role === "mini_financiera")) return false;
+      // Mini Financiera solo ve las solicitudes que Cartera marcó con
+      // "Pago Aplicado" al crearlas.
+      if (role === "mini_financiera" && !r.pago_aplicado) return false;
       if (!s) return true;
       return (
         r.nombre.toLowerCase().includes(s) ||
@@ -297,6 +316,15 @@ export default function AdminPanel() {
     rechazada: visibleForRole.filter((r) => r.status === "rechazada").length,
   }), [visibleForRole]);
 
+  // Solo para Mini Financiera: filtro por el sub-estado de Gestión de Pago
+  // en vez del estado principal de la solicitud.
+  const gestionCounts = useMemo(() => ({
+    all: visibleForRole.length,
+    pendiente: visibleForRole.filter((r) => !r.gestion_pago).length,
+    aplicado: visibleForRole.filter((r) => r.gestion_pago === "aplicado").length,
+    no_aplicado: visibleForRole.filter((r) => r.gestion_pago === "no_aplicado").length,
+  }), [visibleForRole]);
+
   // Cuántas solicitudes pendientes hay de cada tipo de documento — para el
   // filtro por tipo, así se ve de un vistazo dónde hay trabajo por hacer.
   const tipoPendingCounts = useMemo(() => {
@@ -311,12 +339,16 @@ export default function AdminPanel() {
   const filtered = useMemo(() => {
     const fromTs = dateFrom ? new Date(dateFrom).getTime() : 0;
     return visibleForRole.filter((r) => {
-      if (statusFilter !== "all" && r.status !== statusFilter) return false;
+      if (isMiniFinanciera) {
+        if (gestionFilter === "pendiente" && r.gestion_pago) return false;
+        if (gestionFilter === "aplicado" && r.gestion_pago !== "aplicado") return false;
+        if (gestionFilter === "no_aplicado" && r.gestion_pago !== "no_aplicado") return false;
+      } else if (statusFilter !== "all" && r.status !== statusFilter) return false;
       if (tipoFilter !== "all" && r.document_type !== tipoFilter) return false;
       if (fromTs && new Date(r.created_at).getTime() < fromTs) return false;
       return true;
     });
-  }, [visibleForRole, statusFilter, tipoFilter, dateFrom]);
+  }, [visibleForRole, statusFilter, gestionFilter, isMiniFinanciera, tipoFilter, dateFrom]);
 
   if (authLoading) return <p className="p-6 text-sm text-muted-foreground">Cargando…</p>;
   if (!canViewAllRequests) {
@@ -606,6 +638,46 @@ export default function AdminPanel() {
     load();
   };
 
+  const confirmGestionPago = async () => {
+    if (!gestionandoPago) return;
+    const { r, kind } = gestionandoPago;
+    setGestionPagoBusy(true);
+    try {
+      const user = (await supabase.auth.getUser()).data.user;
+      const nextAdjuntos = [...(r.gestion_pago_adjuntos ?? [])];
+      if (gestionPagoFile) {
+        const ext = gestionPagoFile.name.includes(".") ? gestionPagoFile.name.split(".").pop() : "bin";
+        const path = `gestion-pago/${r.id}-${Date.now()}.${ext}`;
+        const { error: upErr } = await supabase.storage
+          .from("invoice-files")
+          .upload(path, gestionPagoFile, { contentType: gestionPagoFile.type || "application/octet-stream" });
+        if (upErr) throw upErr;
+        nextAdjuntos.push({ path, name: gestionPagoFile.name, size: gestionPagoFile.size, type: gestionPagoFile.type });
+      }
+      const { error } = await supabase
+        .from("invoice_requests")
+        .update({
+          gestion_pago: kind,
+          gestion_pago_nota: gestionPagoNota.trim() || null,
+          gestion_pago_adjuntos: nextAdjuntos as any,
+          gestion_pago_at: new Date().toISOString(),
+          gestion_pago_by: user?.id ?? null,
+        })
+        .eq("id", r.id);
+      if (error) throw error;
+      // Sin notificación por correo — es un sub-estado interno de seguimiento.
+      toast.success(kind === "aplicado" ? "Marcado como Pago Aplicado" : "Marcado como Pago No Aplicado");
+      setGestionandoPago(null);
+      setGestionPagoNota("");
+      setGestionPagoFile(null);
+      load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo guardar");
+    } finally {
+      setGestionPagoBusy(false);
+    }
+  };
+
   const removeRequest = async (r: Req) => {
     if (!confirm(`¿Eliminar definitivamente la factura de ${r.nombre}${r.recibo_numero ? ` (#${r.recibo_numero})` : ""}? Esto también borrará los archivos adjuntos.`)) return;
     await deleteInvoiceFiles(r.attachments, r.approved_pdf_path);
@@ -771,34 +843,64 @@ export default function AdminPanel() {
           </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
-          {([
-            { id: "all" as const, label: "Todas", icon: "📋" },
-            { id: "pendiente" as const, label: "Pendientes", icon: "🟡" },
-            { id: "aprobada" as const, label: "Aprobadas", icon: "🟢" },
-            { id: "corregida" as const, label: "Corregidas", icon: "🔵" },
-            { id: "rechazada" as const, label: "Rechazadas", icon: "🔴" },
-          ]).map((c) => {
-            const active = statusFilter === c.id;
-            return (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => setStatusFilter(c.id)}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition-all",
-                  active ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted/50 text-muted-foreground hover:bg-muted",
-                )}
-              >
-                <span>{c.icon}</span> {c.label}
-                <span className={cn(
-                  "rounded-full px-1.5 py-0.5 text-xs font-bold",
-                  active ? "bg-white/20" : "bg-background",
-                )}>
-                  {statusCounts[c.id]}
-                </span>
-              </button>
-            );
-          })}
+          {isMiniFinanciera ? (
+            ([
+              { id: "all" as const, label: "Todas", icon: "📋" },
+              { id: "pendiente" as const, label: "Pendiente", icon: "🟡" },
+              { id: "aplicado" as const, label: "Pago Aplicado", icon: "🟢" },
+              { id: "no_aplicado" as const, label: "Pago No Aplicado", icon: "🔴" },
+            ]).map((c) => {
+              const active = gestionFilter === c.id;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setGestionFilter(c.id)}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition-all",
+                    active ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted/50 text-muted-foreground hover:bg-muted",
+                  )}
+                >
+                  <span>{c.icon}</span> {c.label}
+                  <span className={cn(
+                    "rounded-full px-1.5 py-0.5 text-xs font-bold",
+                    active ? "bg-white/20" : "bg-background",
+                  )}>
+                    {gestionCounts[c.id]}
+                  </span>
+                </button>
+              );
+            })
+          ) : (
+            ([
+              { id: "all" as const, label: "Todas", icon: "📋" },
+              { id: "pendiente" as const, label: "Pendientes", icon: "🟡" },
+              { id: "aprobada" as const, label: "Aprobadas", icon: "🟢" },
+              { id: "corregida" as const, label: "Corregidas", icon: "🔵" },
+              { id: "rechazada" as const, label: "Rechazadas", icon: "🔴" },
+            ]).map((c) => {
+              const active = statusFilter === c.id;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setStatusFilter(c.id)}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition-all",
+                    active ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted/50 text-muted-foreground hover:bg-muted",
+                  )}
+                >
+                  <span>{c.icon}</span> {c.label}
+                  <span className={cn(
+                    "rounded-full px-1.5 py-0.5 text-xs font-bold",
+                    active ? "bg-white/20" : "bg-background",
+                  )}>
+                    {statusCounts[c.id]}
+                  </span>
+                </button>
+              );
+            })
+          )}
         </div>
         <div className="mt-2 flex flex-wrap gap-2">
           {([
@@ -861,6 +963,14 @@ export default function AdminPanel() {
                         <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider", STATUS_PILL[r.status])}>
                           {r.status === "pendiente" ? "Pendiente" : r.status === "aprobada" ? "Aprobada" : r.status === "corregida" ? "Corregida" : "Rechazada"}
                         </span>
+                        {r.gestion_pago && (
+                          <span className={cn(
+                            "rounded-full px-2.5 py-0.5 text-xs font-bold",
+                            r.gestion_pago === "aplicado" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700",
+                          )}>
+                            💰 {r.gestion_pago === "aplicado" ? "Pago Aplicado" : "Pago NO Aplicado"}
+                          </span>
+                        )}
                         {r.recibo_numero && <span className="text-sm font-mono text-muted-foreground">#{r.recibo_numero}</span>}
                         {r.parent_id && (
                           isCorrectionOfApproved(r)
@@ -1017,7 +1127,7 @@ export default function AdminPanel() {
 
       {/* Rechazar */}
       <Dialog open={!!rejecting} onOpenChange={(o) => { if (!o) { setRejecting(null); setRejectCategory(""); setRejectOtherText(""); } }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Rechazar solicitud</DialogTitle>
             <p className="text-sm text-muted-foreground pt-1">Selecciona el motivo — el comercial lo verá con la explicación completa.</p>
@@ -1056,6 +1166,45 @@ export default function AdminPanel() {
           <DialogFooter>
             <Button variant="outline" onClick={() => { setRejecting(null); setRejectCategory(""); setRejectOtherText(""); }}>Cancelar</Button>
             <Button className="bg-rose-600 hover:bg-rose-700 text-white border-0" onClick={confirmReject} disabled={!rejectCategory || (rejectCategory === "Otra razón" && !rejectOtherText.trim())}>Rechazar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!gestionandoPago} onOpenChange={(o) => { if (!o) { setGestionandoPago(null); setGestionPagoNota(""); setGestionPagoFile(null); } }}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {gestionandoPago?.kind === "aplicado" ? "Marcar Pago Aplicado" : "Marcar Pago NO Aplicado"}
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground pt-1">
+              Este es un sub-estado interno de seguimiento — no envía correo ni cambia el estado principal de la solicitud.
+            </p>
+          </DialogHeader>
+          <div className="space-y-3 py-1">
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Nota (opcional)</label>
+              <Textarea
+                rows={3}
+                value={gestionPagoNota}
+                onChange={(e) => setGestionPagoNota(e.target.value)}
+                placeholder="Detalle de la gestión de pago (opcional)…"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Adjuntar soporte (opcional)</label>
+              <Input type="file" onChange={(e) => setGestionPagoFile(e.target.files?.[0] ?? null)} />
+              {gestionPagoFile && <p className="text-xs text-muted-foreground">{gestionPagoFile.name} · {(gestionPagoFile.size / 1024).toFixed(0)} KB</p>}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setGestionandoPago(null); setGestionPagoNota(""); setGestionPagoFile(null); }}>Cancelar</Button>
+            <Button
+              className={gestionandoPago?.kind === "aplicado" ? "bg-emerald-600 hover:bg-emerald-700 text-white border-0" : "bg-rose-600 hover:bg-rose-700 text-white border-0"}
+              onClick={confirmGestionPago}
+              disabled={gestionPagoBusy}
+            >
+              {gestionPagoBusy ? "Guardando…" : (gestionandoPago?.kind === "aplicado" ? "Confirmar Pago Aplicado" : "Confirmar Pago NO Aplicado")}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1145,6 +1294,16 @@ export default function AdminPanel() {
                           </Button>
                         </>
                       )}
+                      {canGestionarPago && previewing.pago_aplicado && GESTION_PAGO_DOC_TYPES.includes(previewing.document_type ?? "") && (
+                        <>
+                          <Button size="sm" variant="outline" className="rounded-full text-rose-700 border-rose-200 hover:bg-rose-600 hover:text-white" onClick={() => setGestionandoPago({ r: previewing, kind: "no_aplicado" })}>
+                            <XCircle className="mr-1.5 h-3.5 w-3.5" /> Pago NO Aplicado
+                          </Button>
+                          <Button size="sm" variant="outline" className="rounded-full text-emerald-700 border-emerald-200 hover:bg-emerald-600 hover:text-white" onClick={() => setGestionandoPago({ r: previewing, kind: "aplicado" })}>
+                            <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Pago Aplicado
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1161,6 +1320,18 @@ export default function AdminPanel() {
                               <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-bold", STATUS_PILL[previewing.status])}>
                                 {previewing.status === "pendiente" ? "Pendiente" : previewing.status === "aprobada" ? "Aprobada" : previewing.status === "corregida" ? "Corregida" : "Rechazada"}
                               </span>
+                              {previewing.gestion_pago && (
+                                <button
+                                  type="button"
+                                  onClick={() => document.getElementById("gestion-pago-section")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                                  className={cn(
+                                    "rounded-full px-2.5 py-0.5 text-xs font-bold transition-opacity hover:opacity-80",
+                                    previewing.gestion_pago === "aplicado" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700",
+                                  )}
+                                >
+                                  💰 {previewing.gestion_pago === "aplicado" ? "Pago Aplicado" : "Pago NO Aplicado"}
+                                </button>
+                              )}
                             </div>
                             {previewing.document_type === "factura_colombia" && (
                               <DetailSection title="Recuento" noGrid>
@@ -1242,28 +1413,6 @@ export default function AdminPanel() {
                               </DetailSection>
                             )}
 
-                            <DetailSection title="Estado y seguimiento">
-                              <PreviewRow label={CREATOR_ROLE_LABELS[previewing.created_by_role ?? ""] ?? "Líder Comercial"} value={previewing.comercial_nombre ?? "—"} />
-                              <PreviewRow label={`Correo ${CREATOR_ROLE_LABELS[previewing.created_by_role ?? ""] ?? "Líder Comercial"}`} value={previewing.comercial_email ?? "—"} />
-                              {previewing.asesor_nombre && (
-                                <PreviewRow label="Asesor Comercial" value={previewing.asesor_nombre} />
-                              )}
-                              <PreviewRow label="Creada" value={formatDate(previewing.created_at)} />
-                              {previewing.approved_at && <PreviewRow label="Aprobada" value={formatDate(previewing.approved_at)} />}
-                              {previewing.observaciones && (
-                                <div className="sm:col-span-full">
-                                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Observaciones</p>
-                                  <p className="mt-0.5 text-foreground">{previewing.observaciones}</p>
-                                </div>
-                              )}
-                              {previewing.rejection_reason && (
-                                <div className="sm:col-span-full rounded-lg bg-destructive/10 px-3 py-2">
-                                  <p className="text-xs uppercase tracking-wider text-destructive">⚠️ Motivo de rechazo</p>
-                                  <p className="mt-0.5 text-destructive">{previewing.rejection_reason}</p>
-                                </div>
-                              )}
-                            </DetailSection>
-
                             <DetailSection title="Programa">
                             <PreviewRow label="Concepto" value={previewing.concepto ?? "—"} />
                             <PreviewRow label="Tipo de programa" value={previewing.tipo_programa ?? "—"} />
@@ -1315,6 +1464,46 @@ export default function AdminPanel() {
                             <PreviewRow label="Límite de pago" value={previewing.fecha_limite_pago ?? "—"} />
                             <PreviewRow label="Pago extraordinario" value={previewing.fecha_pago_extraordinario ?? "—"} />
                           </DetailSection>
+
+                            {previewing.pago_aplicado && GESTION_PAGO_DOC_TYPES.includes(previewing.document_type ?? "") && (
+                              <div id="gestion-pago-section">
+                              <DetailSection title="Gestión de Pago">
+                                <PreviewRow label="Pago Aplicado (marcado al crear)" value={previewing.pago_aplicado ? "Sí" : "No"} />
+                                <PreviewRow
+                                  label="Estado de gestión"
+                                  value={previewing.gestion_pago === "aplicado" ? "Pago Aplicado" : previewing.gestion_pago === "no_aplicado" ? "Pago NO Aplicado" : "Sin gestionar todavía"}
+                                />
+                                {previewing.gestion_pago_at && (
+                                  <PreviewRow label="Fecha de gestión" value={formatDateTime(previewing.gestion_pago_at)} />
+                                )}
+                                {previewing.gestion_pago_nota && (
+                                  <div className="sm:col-span-full">
+                                    <p className="text-xs uppercase tracking-wider text-muted-foreground">Nota de gestión</p>
+                                    <p className="mt-0.5 text-foreground">{previewing.gestion_pago_nota}</p>
+                                  </div>
+                                )}
+                                {previewing.gestion_pago_adjuntos && previewing.gestion_pago_adjuntos.length > 0 && (
+                                  <div className="sm:col-span-full space-y-1.5">
+                                    <p className="text-xs uppercase tracking-wider text-muted-foreground">Adjuntos de soporte</p>
+                                    <div className="grid gap-2 sm:grid-cols-2">
+                                      {previewing.gestion_pago_adjuntos.map((a) => (
+                                        <button
+                                          key={a.path}
+                                          type="button"
+                                          onClick={() => openAttachment(a.path)}
+                                          className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-left text-xs hover:bg-muted/60 transition-colors"
+                                        >
+                                          <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                          <span className="min-w-0 flex-1 truncate font-medium text-foreground">{a.name}</span>
+                                          <span className="shrink-0 text-muted-foreground">{(a.size / 1024).toFixed(0)} KB</span>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </DetailSection>
+                              </div>
+                            )}
 
                             {(!hasCurrentAttachments && !hasHistoricalAttachments ? (
                             <p className="text-sm text-muted-foreground">Esta solicitud no tiene archivos adjuntos.</p>
@@ -1369,6 +1558,28 @@ export default function AdminPanel() {
                               </div>
                             </DetailSection>
                           ))}
+
+                            <DetailSection title="Estado y seguimiento">
+                              <PreviewRow label={CREATOR_ROLE_LABELS[previewing.created_by_role ?? ""] ?? "Líder Comercial"} value={previewing.comercial_nombre ?? "—"} />
+                              <PreviewRow label={`Correo ${CREATOR_ROLE_LABELS[previewing.created_by_role ?? ""] ?? "Líder Comercial"}`} value={previewing.comercial_email ?? "—"} />
+                              {previewing.asesor_nombre && (
+                                <PreviewRow label="Asesor Comercial" value={previewing.asesor_nombre} />
+                              )}
+                              <PreviewRow label="Creada" value={formatDateTime(previewing.created_at)} />
+                              {previewing.approved_at && <PreviewRow label="Aprobada" value={formatDate(previewing.approved_at)} />}
+                              {previewing.observaciones && (
+                                <div className="sm:col-span-full">
+                                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Observaciones</p>
+                                  <p className="mt-0.5 text-foreground">{previewing.observaciones}</p>
+                                </div>
+                              )}
+                              {previewing.rejection_reason && (
+                                <div className="sm:col-span-full rounded-lg bg-destructive/10 px-3 py-2">
+                                  <p className="text-xs uppercase tracking-wider text-destructive">⚠️ Motivo de rechazo</p>
+                                  <p className="mt-0.5 text-destructive">{previewing.rejection_reason}</p>
+                                </div>
+                              )}
+                            </DetailSection>
                         </>
                       </div>
                 </div>

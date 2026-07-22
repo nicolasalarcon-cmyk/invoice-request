@@ -29,12 +29,13 @@ async function apiUsers(token: string): Promise<AppUser[]> {
   return res.json() as Promise<AppUser[]>;
 }
 
-type AppRoleOption = "super_admin" | "admin" | "financiera" | "cartera" | "comercial";
+type AppRoleOption = "super_admin" | "admin" | "financiera" | "cartera" | "mini_financiera" | "comercial";
 const ROLE_OPTIONS: { value: AppRoleOption; label: string }[] = [
   { value: "super_admin",  label: "SuperAdministrador" },
   { value: "admin",        label: "Administrador" },
   { value: "financiera",   label: "Financiera" },
   { value: "cartera",      label: "Cartera" },
+  { value: "mini_financiera", label: "Mini Financiera" },
   { value: "comercial",    label: "Comercial" },
 ];
 

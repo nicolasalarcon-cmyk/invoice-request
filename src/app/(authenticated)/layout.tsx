@@ -17,6 +17,7 @@ const ROLE_LABELS: Record<string, string> = {
   admin: "Administrador",
   financiera: "Financiera",
   cartera: "Cartera",
+  mini_financiera: "Mini Financiera",
   comercial: "Comercial",
 };
 
@@ -158,7 +159,8 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
           <nav className="flex items-center gap-0.5 overflow-x-auto whitespace-nowrap [scrollbar-width:thin]">
 
             {/* ── Tabs operativas — mismo orden para todos los roles: Crear, Solicitudes, Dashboard ── */}
-            <div className="shrink-0"><CreateNavButton /></div>
+            {/* Mini Financiera solo revisa/valida pagos: no crea solicitudes. */}
+            {role !== "mini_financiera" && <div className="shrink-0"><CreateNavButton /></div>}
             <div className="shrink-0">
               {canViewAllRequests ? (
                 <NavTab href="/admin" icon={<ClipboardList className="h-4 w-4" />} label="Solicitudes" badge={badgeCount} resetInbox />

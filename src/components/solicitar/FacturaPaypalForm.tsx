@@ -26,6 +26,7 @@ const SECTION_TITLE_BY_ROLE: Record<string, string> = {
   admin: "Datos de Administrador",
   financiera: "Datos de Financiera",
   cartera: "Datos de Cartera",
+  mini_financiera: "Datos de Mini Financiera",
   comercial: "Datos del Líder Comercial",
 };
 
@@ -66,6 +67,7 @@ interface PpForm {
   fecha_inicio: string;
   valor: string;
   fecha_limite_pago: string;
+  pago_aplicado: boolean;
 }
 
 const EMPTY: PpForm = {
@@ -77,6 +79,7 @@ const EMPTY: PpForm = {
   lista_cerrada: true, valor_por_estudiante: "", descuento_pct: "0",
   programa: "", nemonico: "", cohorte: "", numero_inscripcion: "", fecha_inicio: "",
   valor: "", fecha_limite_pago: "",
+  pago_aplicado: false,
 };
 
 export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string; duplicateFromId?: string }) {
@@ -150,6 +153,7 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
       fecha_inicio: data.fecha_inicio ?? "",
       valor: String(data.valor_total ?? ""),
       fecha_limite_pago: data.fecha_limite_pago ?? "",
+      pago_aplicado: (d.pago_aplicado as boolean | null) ?? false,
     });
   };
 
@@ -270,6 +274,7 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
         recargo_total: isAbierta ? valorTotalEmpresa : valorNum,
         fecha_limite_pago: form.fecha_limite_pago,
         observaciones: null,
+        pago_aplicado: role === "cartera" ? form.pago_aplicado : false,
         attachments,
       };
 
@@ -610,6 +615,24 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
                     <Input required type="date" value={form.fecha_limite_pago} onChange={(e) => update("fecha_limite_pago", e.target.value)} />
                   </Field>
                 </>
+              )}
+              {role === "cartera" && (
+                <div className="sm:col-span-2">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4"
+                      checked={form.pago_aplicado}
+                      onChange={(e) => update("pago_aplicado", e.target.checked)}
+                    />
+                    Requiere validación de pago
+                  </label>
+                  {form.pago_aplicado && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      No olvides adjuntar los soportes de pago en la sección de Adjuntos, más abajo.
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           </Section>
