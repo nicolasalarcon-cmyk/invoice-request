@@ -76,6 +76,12 @@ export function resolveOrdenData(data: InvoiceData, tpl: InvoiceTemplate): Orden
     horas = data.horas_programa != null ? String(data.horas_programa) : (data.duracion ?? "—");
   }
 
+  // Para Especialización se factura a una cuenta bancaria distinta a la de
+  // Diplomados — se sobreescribe el medio de pago de la plantilla.
+  const medios_pago = tipo.includes("especial")
+    ? "Bancolombia Cuenta Ahorros 19100002833 a nombre de Corporación Universitaria de Cataluña NIT 901.032.802-6"
+    : tpl.medios_pago;
+
   const codigo_est =
     data.codigo_estudiante && data.codigo_estudiante.trim()
       ? data.codigo_estudiante
@@ -87,7 +93,7 @@ export function resolveOrdenData(data: InvoiceData, tpl: InvoiceTemplate): Orden
   return {
     nit: tpl.nit,
     descripcion_legal: tpl.descripcion_legal,
-    medios_pago: tpl.medios_pago,
+    medios_pago,
     nota_retencion: tpl.nota_retencion,
     nota_legal: tpl.nota_legal,
     recibo_numero: String(data.recibo_numero ?? "—"),
