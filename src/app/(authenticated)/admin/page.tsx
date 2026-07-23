@@ -217,10 +217,6 @@ export default function AdminPanel() {
   const [gestionPagoFile, setGestionPagoFile] = useState<File | null>(null);
   const [gestionPagoBusy, setGestionPagoBusy] = useState(false);
   const [previewing, setPreviewing] = useState<Req | null>(null);
-  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
-  const [pdfPreviewName, setPdfPreviewName] = useState("");
-  const [pdfPreviewLoading, setPdfPreviewLoading] = useState(false);
-  const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
   const [responseViewOpen, setResponseViewOpen] = useState(false);
   const [responseLoading, setResponseLoading] = useState(false);
   const [responseNotesText, setResponseNotesText] = useState("");
@@ -778,26 +774,23 @@ export default function AdminPanel() {
   };
 
   const openPdfPreview = async (r: Req) => {
-    setPdfPreviewOpen(true);
-    setPdfPreviewLoading(true);
-    setPdfPreviewUrl(null);
-    setPdfPreviewName(`recibo-${r.recibo_numero ?? "borrador"}-${r.identificacion}.pdf`);
+    // Se abre una pestaña en blanco de inmediato (dentro del gesto de click) para
+    // que el navegador no la bloquee como pop-up; luego se le asigna la URL real.
+    const win = window.open("", "_blank");
     try {
       if (r.approved_pdf_path) {
         const { data, error } = await supabase.storage.from("invoice-files").createSignedUrl(r.approved_pdf_path, 300);
         if (error || !data) throw error ?? new Error("no signed url");
-        setPdfPreviewUrl(data.signedUrl);
+        if (win) win.location.href = data.signedUrl;
         return;
       }
-      const { getInvoicePdfDataUrl } = await import("@/lib/generate-invoice-pdf");
-      const url = await getInvoicePdfDataUrl(reqToPdfData(r));
-      setPdfPreviewUrl(url);
+      const { getInvoicePdfBlobUrl } = await import("@/lib/generate-invoice-pdf");
+      const url = await getInvoicePdfBlobUrl(reqToPdfData(r));
+      if (win) win.location.href = url;
     } catch (err) {
       console.error("Error generando vista previa PDF:", err);
       toast.error("No se pudo generar la vista previa");
-      setPdfPreviewOpen(false);
-    } finally {
-      setPdfPreviewLoading(false);
+      win?.close();
     }
   };
 
@@ -1615,35 +1608,6 @@ export default function AdminPanel() {
               )}
             </div>
           )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog: Ver PDF */}
-      <Dialog open={pdfPreviewOpen} onOpenChange={(o) => { if (!o) { setPdfPreviewOpen(false); setPdfPreviewUrl(null); } }}>
-        <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 gap-0">
-          <DialogHeader className="px-6 py-4 border-b border-border shrink-0">
-            <DialogTitle className="flex items-center gap-2">
-              <Eye className="h-4 w-4" /> Ver PDF — {pdfPreviewName}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 overflow-hidden">
-            {pdfPreviewLoading ? (
-              <div className="flex h-full items-center justify-center gap-3 text-muted-foreground">
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-border border-t-primary" />
-                Generando vista previa…
-              </div>
-            ) : pdfPreviewUrl ? (
-              <iframe src={pdfPreviewUrl} title="Ver PDF" className="h-full w-full border-0" />
-            ) : null}
-          </div>
-          <DialogFooter className="px-6 py-3 border-t border-border shrink-0">
-            {pdfPreviewUrl && (
-              <a href={pdfPreviewUrl} download={pdfPreviewName}>
-                <Button variant="outline"><FileDown className="mr-2 h-4 w-4" /> Descargar</Button>
-              </a>
-            )}
-            <Button variant="outline" onClick={() => { setPdfPreviewOpen(false); setPdfPreviewUrl(null); }}>Cerrar</Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </main>

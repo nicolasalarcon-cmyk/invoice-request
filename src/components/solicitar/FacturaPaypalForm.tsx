@@ -30,6 +30,8 @@ const SECTION_TITLE_BY_ROLE: Record<string, string> = {
   comercial: "Datos del Líder Comercial",
 };
 
+const CONCEPTOS_FIJOS = ["Matrícula", "Matrícula Parcial", "Otro"] as const;
+
 interface Participant {
   nombre: string;
   cedula: string;
@@ -65,6 +67,9 @@ interface PpForm {
   cohorte: string;
   numero_inscripcion: string;
   fecha_inicio: string;
+  concepto_opcion: string;
+  concepto_otro: string;
+  valor_parcial: string;
   valor: string;
   fecha_limite_pago: string;
   pago_aplicado: boolean;
@@ -78,6 +83,7 @@ const EMPTY: PpForm = {
   numero_participantes: "",
   lista_cerrada: true, valor_por_estudiante: "", descuento_pct: "0",
   programa: "", nemonico: "", cohorte: "", numero_inscripcion: "", fecha_inicio: "",
+  concepto_opcion: "Matrícula", concepto_otro: "", valor_parcial: "",
   valor: "", fecha_limite_pago: "",
   pago_aplicado: false,
 };
@@ -88,6 +94,7 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState<PpForm>(EMPTY);
+  const [usarValorParcial, setUsarValorParcial] = useState(false);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [historicalAttachments, setHistoricalAttachments] = useState<AttachmentItem[]>([]);
@@ -128,6 +135,8 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
     setParticipants(Array.isArray(parts) ? parts : []);
     const tipoPersona = (d.tipo_persona as TipoPersona) || "Persona Natural";
     const isNatural = tipoPersona === "Persona Natural";
+    const conceptoRaw = data.concepto ?? "Matrícula";
+    const isFijoConcepto = (CONCEPTOS_FIJOS as readonly string[]).includes(conceptoRaw);
     setForm({
       tipo_persona: tipoPersona,
       asesor_nombre: (d.asesor_nombre as string) ?? "",
@@ -151,10 +160,14 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
       cohorte: data.cohorte ?? "",
       numero_inscripcion: (d.numero_inscripcion as string) ?? "",
       fecha_inicio: data.fecha_inicio ?? "",
+      concepto_opcion: isFijoConcepto ? conceptoRaw : "Otro",
+      concepto_otro: isFijoConcepto ? "" : conceptoRaw,
+      valor_parcial: d.valor_parcial != null ? String(d.valor_parcial) : "",
       valor: String(data.valor_total ?? ""),
       fecha_limite_pago: data.fecha_limite_pago ?? "",
       pago_aplicado: (d.pago_aplicado as boolean | null) ?? false,
     });
+    setUsarValorParcial(d.valor_parcial != null && Number(d.valor_parcial) > 0);
   };
 
   useEffect(() => {
@@ -203,6 +216,12 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
     setForm((f) => ({ ...f, cohorte: c.codigo, fecha_inicio: c.fecha_inicio }));
   };
 
+  const isMatriculaParcial = form.concepto_opcion === "Matrícula Parcial";
+  // Para cartera, Matrícula Parcial no usa el checkbox/campo aparte: el propio
+  // campo de valor ES el valor parcial a facturar (aquí ya no aplica descuento
+  // en la rama cerrada, así que no hay nada más que sobreescribir).
+  const isCarteraPartial = role === "cartera" && isMatriculaParcial;
+
   const valorNum = Number(form.valor) || 0;
 
   // Persona Jurídica + lista abierta: cobro por participante (valor por
@@ -211,6 +230,7 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
   const isJuridicaAbierta = form.tipo_persona === "Persona Jurídica" && !form.lista_cerrada;
   const { valorPorEstudianteNum, valorTotalPorEstudiante, valorTotalEmpresa } = useMemo(() => {
     const vpe = Number(form.valor_por_estudiante) || 0;
+    if (isCarteraPartial) return { valorPorEstudianteNum: vpe, valorTotalPorEstudiante: vpe, valorTotalEmpresa: vpe * numParticipantes };
     const pct = Math.min(Math.max(Number(form.descuento_pct) || 0, 0), 100);
     const totalPorEstudiante = Math.max(vpe - Math.round((vpe * pct) / 100), 0);
     return {
@@ -218,16 +238,20 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
       valorTotalPorEstudiante: totalPorEstudiante,
       valorTotalEmpresa: totalPorEstudiante * numParticipantes,
     };
-  }, [form.valor_por_estudiante, form.descuento_pct, numParticipantes]);
+  }, [form.valor_por_estudiante, form.descuento_pct, numParticipantes, isCarteraPartial]);
   // Lista cerrada: valor por estudiante es solo informativo (valor total ÷ participantes).
   const valorPorEstudianteInformativo = form.tipo_persona === "Persona Jurídica" && form.lista_cerrada && numParticipantes > 0
     ? Math.round(valorNum / numParticipantes)
     : 0;
 
+  const isPartialActive = isMatriculaParcial && (isCarteraPartial || (usarValorParcial && Number(form.valor_parcial) > 0));
+  const conceptoFinal = form.concepto_opcion === "Otro" ? (form.concepto_otro.trim() || "Otro") : form.concepto_opcion;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     if (!form.tipo_persona) { toast.error("Selecciona el tipo de persona."); return; }
+    if (form.concepto_opcion === "Otro" && !form.concepto_otro.trim()) { toast.error("Escribe el concepto personalizado."); return; }
     if (role === "comercial" && !form.asesor_nombre) { toast.error("Selecciona el asesor comercial correspondiente."); return; }
     if (role === "cartera" && !form.numero_inscripcion.trim()) { toast.error("El número de inscripción es obligatorio."); return; }
     setBusy(true);
@@ -236,6 +260,10 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
       const isNatural = form.tipo_persona === "Persona Natural";
       const isJuridica = form.tipo_persona === "Persona Jurídica";
       const isAbierta = isJuridica && !form.lista_cerrada;
+      // El checkbox de valor parcial (no-cartera) sobreescribe el total final,
+      // sin tocar el cálculo normal (que sigue viéndose igual en el formulario).
+      const finalTotalCerrada = (isPartialActive && !isCarteraPartial) ? (Number(form.valor_parcial) || 0) : valorNum;
+      const finalTotalAbierta = (isPartialActive && !isCarteraPartial) ? (Number(form.valor_parcial) || 0) : valorTotalEmpresa;
 
       const payload = {
         document_type: "factura_paypal",
@@ -263,15 +291,16 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
         fecha_inicio: form.fecha_inicio || null,
         fecha_fin: null, horas_programa: null, duracion: null, convocatoria: null,
         periodo,
-        concepto: "Matrícula",
+        concepto: conceptoFinal,
         matricula: isAbierta ? valorPorEstudianteNum : valorNum,
         descuento: isAbierta ? (valorPorEstudianteNum - valorTotalPorEstudiante) : 0,
         descuento_pct: isAbierta ? (Number(form.descuento_pct) || 0) : 0,
         descuento_bono: isAbierta ? (valorPorEstudianteNum - valorTotalPorEstudiante) : 0,
-        valor_total: isAbierta ? valorTotalPorEstudiante : valorNum,
-        valor_total_empresa: isJuridica ? (isAbierta ? valorTotalEmpresa : valorNum) : null,
+        valor_total: isAbierta ? valorTotalPorEstudiante : finalTotalCerrada,
+        valor_total_empresa: isJuridica ? (isAbierta ? finalTotalAbierta : finalTotalCerrada) : null,
         valor_por_estudiante: isJuridica ? (isAbierta ? valorTotalPorEstudiante : (valorPorEstudianteInformativo || null)) : null,
-        recargo_total: isAbierta ? valorTotalEmpresa : valorNum,
+        recargo_total: isAbierta ? finalTotalAbierta : finalTotalCerrada,
+        valor_parcial: isPartialActive ? (isCarteraPartial ? (isAbierta ? valorTotalEmpresa : valorNum) : Number(form.valor_parcial)) : null,
         fecha_limite_pago: form.fecha_limite_pago,
         observaciones: null,
         pago_aplicado: role === "cartera" ? form.pago_aplicado : false,
@@ -565,14 +594,37 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
           {/* Factura */}
           <Section title="Datos de la factura">
             <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Concepto *">
+                <Select value={form.concepto_opcion} onValueChange={(v) => update("concepto_opcion", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CONCEPTOS_FIJOS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {form.concepto_opcion === "Otro" && (
+                  <Input
+                    className="mt-2"
+                    required
+                    maxLength={200}
+                    value={form.concepto_otro}
+                    onChange={(e) => update("concepto_otro", e.target.value)}
+                    placeholder="Escribe el concepto personalizado"
+                  />
+                )}
+              </Field>
               {isJuridicaAbierta ? (
                 <>
-                  <Field label="Valor por Estudiante *">
+                  <Field label={isCarteraPartial ? "Valor Parcial por Estudiante *" : "Valor por Estudiante *"}>
                     <Input required type="number" min={0} value={form.valor_por_estudiante} onChange={(e) => update("valor_por_estudiante", e.target.value)} />
+                    {isCarteraPartial && (
+                      <p className="mt-1 text-xs text-muted-foreground">Este es el valor que finalmente se factura por estudiante.</p>
+                    )}
                   </Field>
-                  <Field label="Descuento (%)">
-                    <Input type="number" min={0} max={100} step="0.01" value={form.descuento_pct} onChange={(e) => update("descuento_pct", e.target.value)} />
-                  </Field>
+                  {!isCarteraPartial && (
+                    <Field label="Descuento (%)">
+                      <Input type="number" min={0} max={100} step="0.01" value={form.descuento_pct} onChange={(e) => update("descuento_pct", e.target.value)} />
+                    </Field>
+                  )}
                   <Field label="Valor Total por Estudiante">
                     <div className="flex h-9 items-center rounded-md border border-input bg-muted px-3 text-sm font-medium text-foreground">
                       ${valorTotalPorEstudiante.toLocaleString("es-CO", { minimumFractionDigits: 0 })}
@@ -592,8 +644,11 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
                 </>
               ) : (
                 <>
-                  <Field label="Valor *">
+                  <Field label={isCarteraPartial ? "Valor Parcial a Pagar *" : "Valor *"}>
                     <Input required type="number" min={0} value={form.valor} onChange={(e) => update("valor", e.target.value)} />
+                    {isCarteraPartial && (
+                      <p className="mt-1 text-xs text-muted-foreground">Este es el valor que finalmente se factura.</p>
+                    )}
                   </Field>
 
                   <Field label="Valor Total a Pagar">
@@ -616,6 +671,33 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
                   </Field>
                 </>
               )}
+              {isMatriculaParcial && !isCarteraPartial && (
+                <div className="sm:col-span-2">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4"
+                      checked={usarValorParcial}
+                      onChange={(e) => setUsarValorParcial(e.target.checked)}
+                    />
+                    Valor parcial a pagar
+                  </label>
+                  {usarValorParcial && (
+                    <>
+                      <Input
+                        className="mt-2 max-w-xs"
+                        required
+                        type="text"
+                        inputMode="numeric"
+                        value={form.valor_parcial ? Number(form.valor_parcial).toLocaleString("es-CO") : ""}
+                        onChange={(e) => update("valor_parcial", e.target.value.replace(/\D/g, ""))}
+                        placeholder="Valor Parcial a Facturar (COP)"
+                      />
+                      <p className="mt-1 text-xs text-muted-foreground">Este valor es el que finalmente se factura, en vez del Valor Total.</p>
+                    </>
+                  )}
+                </div>
+              )}
               {role === "cartera" && (
                 <div className="sm:col-span-2">
                   <label className="flex items-center gap-2 text-sm font-medium">
@@ -625,7 +707,7 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
                       checked={form.pago_aplicado}
                       onChange={(e) => update("pago_aplicado", e.target.checked)}
                     />
-                    Requiere validación de pago
+                    Incluye soporte de pago
                   </label>
                   {form.pago_aplicado && (
                     <p className="mt-1 text-xs text-muted-foreground">

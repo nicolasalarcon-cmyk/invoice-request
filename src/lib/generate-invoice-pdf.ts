@@ -89,6 +89,16 @@ export async function getInvoicePdfDataUrl(
   });
 }
 
+/** Returns a blob URL, for opening the PDF directly in a new browser tab. */
+export async function getInvoicePdfBlobUrl(
+  data: InvoiceData,
+  tplOverride?: InvoiceTemplate,
+): Promise<string> {
+  const instance = await buildDocument(data, tplOverride);
+  const blob = await instance.toBlob();
+  return URL.createObjectURL(blob);
+}
+
 /** Downloads the PDF directly in the browser. */
 export async function generateInvoicePDF(
   data: InvoiceData,

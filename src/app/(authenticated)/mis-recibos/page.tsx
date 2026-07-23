@@ -255,38 +255,30 @@ export default function MisRecibos() {
     };
   };
 
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewName, setPreviewName] = useState<string>("recibo.pdf");
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
-
   const previewPdf = async (r: Req) => {
-    setPreviewOpen(true);
-    setPreviewLoading(true);
-    setPreviewUrl(null);
-    setPreviewName(`recibo-${r.recibo_numero ?? "sin-numero"}-${r.identificacion}.pdf`);
+    // Se abre una pestaña en blanco de inmediato (dentro del gesto de click) para
+    // que el navegador no la bloquee como pop-up; luego se le asigna la URL real.
+    const win = window.open("", "_blank");
     try {
       if (r.approved_pdf_path) {
         const { data, error } = await supabase.storage
           .from("invoice-files")
           .createSignedUrl(r.approved_pdf_path, 300);
         if (error || !data) throw error ?? new Error("no signed url");
-        setPreviewUrl(data.signedUrl);
+        if (win) win.location.href = data.signedUrl;
         return;
       }
       if (r.document_type === "factura_colombia" || r.document_type === "factura_paypal") {
         toast.error("Esta solicitud no tiene un PDF adjunto.");
-        setPreviewOpen(false);
+        win?.close();
         return;
       }
-      const { getInvoicePdfDataUrl } = await import("@/lib/generate-invoice-pdf");
-      const url = await getInvoicePdfDataUrl(reqToPdfData(r));
-      setPreviewUrl(url);
+      const { getInvoicePdfBlobUrl } = await import("@/lib/generate-invoice-pdf");
+      const url = await getInvoicePdfBlobUrl(reqToPdfData(r));
+      if (win) win.location.href = url;
     } catch {
       toast.error("No se pudo generar la vista previa");
-      setPreviewOpen(false);
-    } finally {
-      setPreviewLoading(false);
+      win?.close();
     }
   };
 
@@ -333,16 +325,6 @@ export default function MisRecibos() {
     const { data, error } = await supabase.storage.from("invoice-files").createSignedUrl(path, 60);
     if (error || !data) return toast.error(error?.message ?? "No se pudo abrir");
     window.open(data.signedUrl, "_blank");
-  };
-
-  const downloadFromPreview = () => {
-    if (!previewUrl) return;
-    const a = document.createElement("a");
-    a.href = previewUrl;
-    a.download = previewName;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
   };
 
   const archiveRequest = async (r: Req) => {
@@ -823,29 +805,6 @@ export default function MisRecibos() {
               )}
             </div>
           )}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>Vista previa del recibo</DialogTitle>
-          </DialogHeader>
-          <div className="h-[70vh] w-full overflow-hidden rounded border border-border bg-muted">
-            {previewLoading || !previewUrl ? (
-              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                Generando vista previa…
-              </div>
-            ) : (
-              <iframe src={previewUrl} title="Vista previa PDF" className="h-full w-full" />
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPreviewOpen(false)}>Cerrar</Button>
-            <Button onClick={downloadFromPreview} disabled={!previewUrl}>
-              <FileDown className="mr-2 h-4 w-4" /> Descargar PDF
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </main>
