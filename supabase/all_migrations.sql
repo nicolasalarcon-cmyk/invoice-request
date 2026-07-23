@@ -897,3 +897,19 @@ CREATE POLICY "Mini financiera puede gestionar pago"
 ON public.invoice_requests FOR UPDATE TO authenticated
 USING (has_role(auth.uid(), 'mini_financiera'::app_role) AND pago_aplicado = true)
 WITH CHECK (has_role(auth.uid(), 'mini_financiera'::app_role) AND pago_aplicado = true);
+
+-- ============================================================
+-- 20260723090000_tipo_tarifa.sql
+-- ============================================================
+
+-- Campo "Tipo de tarifa" para programas de Especialización en Orden de
+-- Matrícula y Factura Colombia (Pago Contado / Pago Egresados / Particulares).
+ALTER TABLE invoice_requests ADD COLUMN IF NOT EXISTS tipo_tarifa text;
+
+-- ============================================================
+-- 20260723100000_lugar_expedicion.sql
+-- ============================================================
+
+-- Lugar de expedición del documento de identidad, para Persona Natural en
+-- Factura Colombia (obligatorio para el rol comercial).
+ALTER TABLE invoice_requests ADD COLUMN IF NOT EXISTS lugar_expedicion text;

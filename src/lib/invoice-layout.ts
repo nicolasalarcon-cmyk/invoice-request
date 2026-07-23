@@ -231,7 +231,7 @@ export function resolveField(el: FieldEl, d: ResolverData, tpl: ResolverTpl): st
     case "periodo": raw = d.periodo; break;
     case "cohorte": raw = d.cohorte ?? "—"; break;
     case "plan_estudio": raw = (d.plan_estudio ?? "—").replace(/\bDiplomado\b\s*/gi, "").trim() || "—"; break;
-    case "fecha_inicio": raw = d.convocatoria ?? d.fecha_inicio ?? "—"; break;
+    case "fecha_inicio": raw = d.fecha_inicio ?? d.convocatoria ?? "—"; break;
     case "fecha_fin": raw = d.fecha_fin ?? "—"; break;
     case "horas_programa": {
       const tipo = (d.tipo_programa ?? "").toLowerCase();

@@ -142,6 +142,7 @@ export type Database = {
           identificacion: string
           info_requested: string | null
           lista_cerrada: boolean
+          lugar_expedicion: string | null
           matricula: number
           nemonico: string | null
           nit: string | null
@@ -172,6 +173,7 @@ export type Database = {
           template_id: string | null
           tipo_persona: string | null
           tipo_programa: string | null
+          tipo_tarifa: string | null
           updated_at: string
           valor_parcial: number | null
           valor_por_estudiante: number | null
@@ -215,6 +217,7 @@ export type Database = {
           identificacion: string
           info_requested?: string | null
           lista_cerrada?: boolean
+          lugar_expedicion?: string | null
           matricula?: number
           nemonico?: string | null
           nit?: string | null
@@ -245,6 +248,7 @@ export type Database = {
           template_id?: string | null
           tipo_persona?: string | null
           tipo_programa?: string | null
+          tipo_tarifa?: string | null
           updated_at?: string
           valor_parcial?: number | null
           valor_por_estudiante?: number | null
@@ -288,6 +292,7 @@ export type Database = {
           identificacion?: string
           info_requested?: string | null
           lista_cerrada?: boolean
+          lugar_expedicion?: string | null
           matricula?: number
           nemonico?: string | null
           nit?: string | null
@@ -318,6 +323,7 @@ export type Database = {
           template_id?: string | null
           tipo_persona?: string | null
           tipo_programa?: string | null
+          tipo_tarifa?: string | null
           updated_at?: string
           valor_parcial?: number | null
           valor_por_estudiante?: number | null

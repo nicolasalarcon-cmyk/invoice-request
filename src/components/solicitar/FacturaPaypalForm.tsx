@@ -122,9 +122,11 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
     if (isEdit) { setOriginalStatus(data.status); setOriginalReciboNumero(data.recibo_numero ?? null); setOriginalApprovedAt(data.approved_at ?? null); }
     const att = (d.attachments as AttachmentItem[] | null) ?? [];
     const attArr = Array.isArray(att) ? att : [];
-    if (isEdit && data.status === "rechazada") {
-      // Los adjuntos de una solicitud rechazada quedan como historial/soporte:
-      // no se cargan como editables, para que no se puedan borrar al corregir.
+    if (isEdit && data.status !== "pendiente") {
+      // Al corregir una solicitud ya decidida (rechazada, aprobada o corregida),
+      // sus adjuntos quedan como historial/soporte: no se cargan como editables,
+      // para no poder borrarlos definitivamente antes de que la corrección se
+      // vuelva a aprobar. Editar una solicitud pendiente sí deja tocarlos.
       setHistoricalAttachments(attArr);
       setAttachments([]);
     } else {

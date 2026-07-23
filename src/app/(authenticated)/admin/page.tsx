@@ -55,6 +55,7 @@ interface Req {
   email: string | null;
   telefono: string | null;
   tipo_persona: string | null;
+  lugar_expedicion: string | null;
   valor_parcial: number | null;
   empresa: string | null;
   nit: string | null;
@@ -69,6 +70,7 @@ interface Req {
   cohorte: string | null;
   plan_estudio: string | null;
   tipo_programa: string | null;
+  tipo_tarifa: string | null;
   fecha_inicio: string | null;
   fecha_fin: string | null;
   horas_programa: number | null;
@@ -544,6 +546,10 @@ export default function AdminPanel() {
   const confirmApprove = async () => {
     if (!approving) return;
     const r = approving;
+    if (r.document_type === "orden_matricula" && !r.fecha_inicio && !r.convocatoria) {
+      toast.error("Esta solicitud no tiene fecha de inicio ni convocatoria — por favor validar con el Super Admin la información de los programas.");
+      return;
+    }
     if (!(await assertNotStale(r))) return;
     const tpl = templates.find((t) => t.id === selectedTemplate);
     const user = (await supabase.auth.getUser()).data.user;
@@ -1374,6 +1380,9 @@ export default function AdminPanel() {
                                 <>
                                   <PreviewRow label={isPersonaFlow ? "Nombre" : "Estudiante"} value={previewing.nombre} />
                                   <PreviewRow label="Identificación" value={previewing.identificacion} />
+                                  {previewing.lugar_expedicion && (
+                                    <PreviewRow label="Lugar de Expedición" value={previewing.lugar_expedicion} />
+                                  )}
                                   {!isPersonaFlow && <PreviewRow label="Tipo de financiación" value={previewing.tipo_persona ?? "—"} />}
                                   {(previewing.pais || previewing.direccion || previewing.ciudad) && (
                                     <>
@@ -1409,6 +1418,7 @@ export default function AdminPanel() {
                             <DetailSection title="Programa">
                             <PreviewRow label="Concepto" value={previewing.concepto ?? "—"} />
                             <PreviewRow label="Tipo de programa" value={previewing.tipo_programa ?? "—"} />
+                            {previewing.tipo_tarifa && <PreviewRow label="Tipo de tarifa" value={previewing.tipo_tarifa} />}
                             <div className="sm:col-span-full">
                               <PreviewRow
                                 label="Programa"
@@ -1435,15 +1445,28 @@ export default function AdminPanel() {
                               <>
                                 <PreviewRow label="Valor de matrícula" value={formatCOP(previewing.matricula)} />
                                 <PreviewRow label="Descuento %" value={`${previewing.descuento_pct}%`} />
-                                <PreviewRow label="Descuento bono" value={formatCOP(previewing.descuento_bono ?? 0)} />
-                                <PreviewRow label="Valor Total" value={formatCOP(previewing.matricula - previewing.descuento - (previewing.descuento_bono ?? 0))} />
+                                {isPersonaFlow ? (
+                                  // En Factura USA/Colombia/PayPal, "descuento" y "descuento_bono" guardan
+                                  // el mismo monto (no hay un campo de bono independiente como en Orden de
+                                  // Matrícula) — mostrar ambos y restarlos duplicaría el descuento.
+                                  <PreviewRow label="Descuento" value={formatCOP(previewing.descuento ?? 0)} />
+                                ) : (
+                                  <>
+                                    <PreviewRow label="Descuento bono" value={formatCOP(previewing.descuento_bono ?? 0)} />
+                                    <PreviewRow label="Valor Total" value={formatCOP(previewing.matricula - previewing.descuento - (previewing.descuento_bono ?? 0))} />
+                                  </>
+                                )}
                                 <PreviewRow label="Valor parcial a facturar" value={formatCOP(previewing.valor_parcial)} />
                               </>
                             ) : (
                               <>
                                 <PreviewRow label="Matrícula" value={formatCOP(previewing.matricula)} />
                                 <PreviewRow label="Descuento %" value={`${previewing.descuento_pct}%`} />
-                                <PreviewRow label="Descuento bono" value={formatCOP(previewing.descuento_bono ?? 0)} />
+                                {isPersonaFlow ? (
+                                  <PreviewRow label="Descuento" value={formatCOP(previewing.descuento ?? 0)} />
+                                ) : (
+                                  <PreviewRow label="Descuento bono" value={formatCOP(previewing.descuento_bono ?? 0)} />
+                                )}
                               </>
                             )}
                             <PreviewRow label="Valor total a pagar" value={formatCOP(previewing.valor_total)} />
@@ -1503,6 +1526,11 @@ export default function AdminPanel() {
                           ) : (
                             <DetailSection title="Adjuntos" noGrid>
                               <div className="space-y-3">
+                                {previewing.recibo_numero && (
+                                  <p className="text-xs text-muted-foreground">
+                                    <span className="font-medium text-foreground">Consecutivo:</span> #{previewing.recibo_numero}
+                                  </p>
+                                )}
                                 {hasHistoricalAttachments && (
                                   <div className="space-y-1.5">
                                     <p className="text-xs font-medium text-muted-foreground">
@@ -1544,7 +1572,7 @@ export default function AdminPanel() {
                                       className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-left text-xs hover:bg-blue-100 transition-colors"
                                     >
                                       <FileDown className="h-4 w-4 shrink-0 text-blue-700" />
-                                      <span className="min-w-0 flex-1 truncate font-medium text-blue-700">PDF oficial aprobado</span>
+                                      <span className="min-w-0 flex-1 truncate font-medium text-blue-700">{previewing.approved_pdf_name ?? "PDF oficial aprobado"}</span>
                                     </button>
                                   )}
                                 </div>

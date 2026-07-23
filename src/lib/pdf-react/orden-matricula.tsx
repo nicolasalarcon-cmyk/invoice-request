@@ -99,7 +99,7 @@ export function resolveOrdenData(data: InvoiceData, tpl: InvoiceTemplate): Orden
     plan_estudio: (data.plan_estudio ?? "—").replace(/\bDiplomado\b\s*/gi, "").trim() || "—",
     periodo: data.periodo,
     cohorte: data.cohorte ?? "—",
-    fecha_inicio: data.convocatoria ?? data.fecha_inicio ?? "—",
+    fecha_inicio: data.fecha_inicio ?? data.convocatoria ?? "—",
     horas_programa: horas,
     concepto: data.concepto ?? "Matrícula",
     matricula,

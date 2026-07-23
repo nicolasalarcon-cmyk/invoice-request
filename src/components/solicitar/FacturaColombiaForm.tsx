@@ -49,6 +49,7 @@ interface CoForm {
   // Persona Natural
   nombre: string;
   cedula: string;
+  lugar_expedicion: string;
   numero_inscripcion: string;
   email_natural: string;
   telefono_natural: string;
@@ -66,6 +67,7 @@ interface CoForm {
   // Shared
   programa: string;
   programaTipo: string;
+  tipo_tarifa: string;
   nemonico: string;
   cohorte: string;
   fecha_inicio: string;
@@ -82,11 +84,11 @@ interface CoForm {
 const EMPTY: CoForm = {
   tipo_persona: "",
   asesor_nombre: "",
-  nombre: "", cedula: "", numero_inscripcion: "", email_natural: "", telefono_natural: "",
+  nombre: "", cedula: "", lugar_expedicion: "", numero_inscripcion: "", email_natural: "", telefono_natural: "",
   empresa: "", nit: "", email_empresa: "", pais: "Colombia", direccion: "",
   ciudad: "", telefono: "", numero_participantes: "",
   lista_cerrada: true, valor_por_estudiante: "",
-  programa: "", programaTipo: "", nemonico: "", cohorte: "", fecha_inicio: "",
+  programa: "", programaTipo: "", tipo_tarifa: "", nemonico: "", cohorte: "", fecha_inicio: "",
   concepto_opcion: "Matrícula", concepto_otro: "", valor_parcial: "",
   valor: "", descuento_pct: "0", fecha_limite_pago: "", observaciones: "",
   pago_aplicado: false,
@@ -132,9 +134,11 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
     if (isEdit) { setOriginalStatus(data.status); setOriginalReciboNumero(data.recibo_numero ?? null); setOriginalApprovedAt(data.approved_at ?? null); }
     const att = (d.attachments as AttachmentItem[] | null) ?? [];
     const attArr = Array.isArray(att) ? att : [];
-    if (isEdit && data.status === "rechazada") {
-      // Los adjuntos de una solicitud rechazada quedan como historial/soporte:
-      // no se cargan como editables, para que no se puedan borrar al corregir.
+    if (isEdit && data.status !== "pendiente") {
+      // Al corregir una solicitud ya decidida (rechazada, aprobada o corregida),
+      // sus adjuntos quedan como historial/soporte: no se cargan como editables,
+      // para no poder borrarlos definitivamente antes de que la corrección se
+      // vuelva a aprobar. Editar una solicitud pendiente sí deja tocarlos.
       setHistoricalAttachments(attArr);
       setAttachments([]);
     } else {
@@ -152,6 +156,7 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
       asesor_nombre: (d.asesor_nombre as string) ?? "",
       nombre: data.nombre ?? "",
       cedula: data.identificacion ?? "",
+      lugar_expedicion: (d.lugar_expedicion as string) ?? "",
       numero_inscripcion: (d.numero_inscripcion as string) ?? "",
       email_natural: isNatural ? (data.email ?? "") : "",
       telefono_natural: isNatural ? ((d.telefono as string) ?? "") : "",
@@ -167,6 +172,7 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
       valor_por_estudiante: d.valor_por_estudiante != null ? String(d.valor_por_estudiante) : "",
       programa: data.programa ?? "",
       programaTipo: (d.tipo_programa as string) ?? "",
+      tipo_tarifa: (d.tipo_tarifa as string) ?? "",
       nemonico: (d.nemonico as string) ?? "",
       cohorte: data.cohorte ?? "",
       fecha_inicio: data.fecha_inicio ?? "",
@@ -270,8 +276,20 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
     if (!user) return;
     if (!form.tipo_persona) { toast.error("Selecciona el tipo de persona."); return; }
     if (form.concepto_opcion === "Otro" && !form.concepto_otro.trim()) { toast.error("Escribe el concepto personalizado."); return; }
+    if ((form.programaTipo || tipoProgramaFiltro).toLowerCase().includes("especial") && !form.tipo_tarifa) {
+      toast.error("Selecciona el tipo de tarifa.");
+      return;
+    }
     if (role === "comercial" && !form.asesor_nombre) { toast.error("Selecciona el asesor comercial correspondiente."); return; }
     if (role === "cartera" && !form.numero_inscripcion.trim()) { toast.error("El número de inscripción es obligatorio."); return; }
+    if (role === "comercial" && form.tipo_persona === "Persona Natural" && !form.lugar_expedicion.trim()) {
+      toast.error("El lugar de expedición del documento de identidad es obligatorio.");
+      return;
+    }
+    if (role === "comercial") {
+      const correo = form.tipo_persona === "Persona Natural" ? form.email_natural : form.email_empresa;
+      if (!correo.trim()) { toast.error("El correo electrónico es obligatorio."); return; }
+    }
     setBusy(true);
     try {
       const today = new Date();
@@ -290,6 +308,7 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
         asesor_nombre: form.asesor_nombre || null,
         nombre: isNatural ? form.nombre : form.empresa,
         identificacion: isNatural ? form.cedula : (form.nit || form.empresa.slice(0, 20)),
+        lugar_expedicion: isNatural ? (form.lugar_expedicion || null) : null,
         numero_inscripcion: form.numero_inscripcion || null,
         email: isNatural ? (form.email_natural || null) : (form.email_empresa || null),
         telefono: isNatural ? (form.telefono_natural || null) : (form.telefono || null),
@@ -302,6 +321,7 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
         participantes: (isAbierta ? participants : []) as unknown as Json,
         lista_cerrada: isJuridica ? form.lista_cerrada : true,
         tipo_programa: form.programaTipo || tipoProgramaFiltro || "Diplomado",
+        tipo_tarifa: (form.programaTipo || tipoProgramaFiltro).toLowerCase().includes("especial") ? (form.tipo_tarifa || null) : null,
         programa: form.programa,
         nemonico: form.nemonico || null,
         codigo_snies: null,
@@ -453,11 +473,14 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
             <Field label="Número de Identificación *">
               <Input required maxLength={50} type="text" inputMode="numeric" value={form.cedula} onChange={(e) => update("cedula", e.target.value.replace(/\D/g, ""))} />
             </Field>
+            <Field label={role === "comercial" ? "Lugar de Expedición *" : "Lugar de Expedición"}>
+              <Input required={role === "comercial"} maxLength={150} value={form.lugar_expedicion} onChange={(e) => update("lugar_expedicion", e.target.value)} />
+            </Field>
             <Field label={role === "cartera" ? "N° de Inscripción *" : "N° de Inscripción"}>
               <Input required={role === "cartera"} maxLength={100} value={form.numero_inscripcion} onChange={(e) => update("numero_inscripcion", e.target.value)} />
             </Field>
-            <Field label="Correo Electrónico">
-              <Input type="email" maxLength={200} value={form.email_natural} onChange={(e) => update("email_natural", e.target.value)} />
+            <Field label={role === "comercial" ? "Correo Electrónico *" : "Correo Electrónico"}>
+              <Input required={role === "comercial"} type="email" maxLength={200} value={form.email_natural} onChange={(e) => update("email_natural", e.target.value)} />
             </Field>
             <Field label="Teléfono">
               <Input maxLength={50} type="text" inputMode="numeric" value={form.telefono_natural} onChange={(e) => update("telefono_natural", e.target.value.replace(/\D/g, ""))} />
@@ -491,8 +514,8 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
                   <Input required maxLength={100} value={form.numero_inscripcion} onChange={(e) => update("numero_inscripcion", e.target.value)} />
                 </Field>
               )}
-              <Field label="Correo Electrónico">
-                <Input type="email" maxLength={200} value={form.email_empresa} onChange={(e) => update("email_empresa", e.target.value)} />
+              <Field label={role === "comercial" ? "Correo Electrónico *" : "Correo Electrónico"}>
+                <Input required={role === "comercial"} type="email" maxLength={200} value={form.email_empresa} onChange={(e) => update("email_empresa", e.target.value)} />
               </Field>
               <Field label="País *">
                 <Input required maxLength={100} value={form.pais} onChange={(e) => update("pais", e.target.value)} />
@@ -625,6 +648,18 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
               <Field label="Fecha de Inicio">
                 <Input value={form.fecha_inicio} onChange={(e) => update("fecha_inicio", e.target.value)} placeholder="Ej: 24/11/2026" />
               </Field>
+              {(form.programaTipo || tipoProgramaFiltro).toLowerCase().includes("especial") && (
+                <Field label="Tipo de tarifa *">
+                  <Select value={form.tipo_tarifa} onValueChange={(v) => update("tipo_tarifa", v)}>
+                    <SelectTrigger><SelectValue placeholder="Selecciona una opción" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="TARIFA PARA PAGO CONTADO">TARIFA PARA PAGO CONTADO</SelectItem>
+                      <SelectItem value="TARIFA PARA PAGO EGRESADOS">TARIFA PARA PAGO EGRESADOS</SelectItem>
+                      <SelectItem value="TARIFA PARA PARTICULARES">TARIFA PARA PARTICULARES</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+              )}
             </div>
           </Section>
 

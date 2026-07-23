@@ -42,6 +42,7 @@ interface FormState {
   asesor_nombre: string;
   tipo_financiacion: string;
   tipo_programa: string;
+  tipo_tarifa: string;
   programa: string;
   programa_nemonico: string;
   codigo_snies: string;
@@ -65,7 +66,7 @@ interface FormState {
 
 const EMPTY: FormState = {
   nombre: "", identificacion: "", numero_inscripcion: "", email: "", asesor_nombre: "", tipo_financiacion: "",
-  tipo_programa: "Diplomado", programa: "", programa_nemonico: "",
+  tipo_programa: "Diplomado", tipo_tarifa: "", programa: "", programa_nemonico: "",
   codigo_snies: "", cohorte: "", plan_estudio: "",
   fecha_inicio: "", fecha_fin: "", horas_programa: "",
   duracion: "", convocatoria: "",
@@ -125,9 +126,11 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
     const d = data as Record<string, unknown>;
     const att = (d.attachments as AttachmentItem[] | null) ?? [];
     const attArr = Array.isArray(att) ? att : [];
-    if (isEdit && data.status === "rechazada") {
-      // Los adjuntos de una solicitud rechazada quedan como historial/soporte:
-      // no se cargan como editables, para que no se puedan borrar al corregir.
+    if (isEdit && data.status !== "pendiente") {
+      // Al corregir una solicitud ya decidida (rechazada, aprobada o corregida),
+      // sus adjuntos quedan como historial/soporte: no se cargan como editables,
+      // para no poder borrarlos definitivamente antes de que la corrección se
+      // vuelva a aprobar. Editar una solicitud pendiente sí deja tocarlos.
       setHistoricalAttachments(attArr);
       setAttachments([]);
     } else {
@@ -144,6 +147,7 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
       asesor_nombre: (d.asesor_nombre as string) ?? "",
       tipo_financiacion: (d.tipo_persona as string) ?? "",
       tipo_programa: data.tipo_programa ?? "Diplomado",
+      tipo_tarifa: (d.tipo_tarifa as string) ?? "",
       programa: data.programa ?? "",
       programa_nemonico: (d.nemonico as string) ?? "",
       codigo_snies: data.codigo_snies ?? "",
@@ -263,6 +267,14 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
       toast.error("El número de inscripción es obligatorio.");
       return;
     }
+    if (!form.fecha_inicio.trim() && !form.convocatoria.trim()) {
+      toast.error("Esta solicitud no tiene fecha de inicio ni convocatoria — por favor validar con el Super Admin la información de los programas.");
+      return;
+    }
+    if (form.tipo_programa.toLowerCase().includes("especial") && !form.tipo_tarifa) {
+      toast.error("Selecciona el tipo de tarifa.");
+      return;
+    }
     setBusy(true);
     try {
       const approveNow = isAdmin && autoApprove && !editId;
@@ -279,6 +291,7 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
         email: form.email || null,
         asesor_nombre: form.asesor_nombre || null,
         tipo_programa: form.tipo_programa,
+        tipo_tarifa: form.tipo_programa.toLowerCase().includes("especial") ? (form.tipo_tarifa || null) : null,
         programa: form.programa || form.tipo_programa,
         nemonico: form.programa_nemonico || null,
         codigo_snies: form.codigo_snies || null,
@@ -456,6 +469,18 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
               </SelectContent>
             </Select>
           </Field>
+          {form.tipo_programa.toLowerCase().includes("especial") && (
+            <Field label="Tipo de tarifa *">
+              <Select value={form.tipo_tarifa} onValueChange={(v) => update("tipo_tarifa", v)}>
+                <SelectTrigger><SelectValue placeholder="Selecciona una opción" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="TARIFA PARA PAGO CONTADO">TARIFA PARA PAGO CONTADO</SelectItem>
+                  <SelectItem value="TARIFA PARA PAGO EGRESADOS">TARIFA PARA PAGO EGRESADOS</SelectItem>
+                  <SelectItem value="TARIFA PARA PARTICULARES">TARIFA PARA PARTICULARES</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+          )}
           <Field label="Nombre del Programa">
             <Popover open={openProg} onOpenChange={setOpenProg}>
               <PopoverTrigger asChild>
