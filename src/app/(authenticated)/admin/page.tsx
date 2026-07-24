@@ -593,6 +593,10 @@ export default function AdminPanel() {
       toast.error("Esta solicitud no tiene fecha de inicio ni convocatoria — por favor validar con el Super Admin la información de los programas.");
       return;
     }
+    if (r.document_type === "orden_matricula" && !r.cohorte) {
+      toast.error("Esta solicitud no tiene Cohorte — por favor validar con el Super Admin la información de los programas.");
+      return;
+    }
     if (!(await assertNotStale(r))) return;
     const tpl = templates.find((t) => t.id === selectedTemplate);
     const user = (await supabase.auth.getUser()).data.user;

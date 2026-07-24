@@ -272,6 +272,10 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
       toast.error("Esta solicitud no tiene fecha de inicio ni convocatoria — por favor validar con el Super Admin la información de los programas.");
       return;
     }
+    if (!form.cohorte.trim()) {
+      toast.error("El campo Cohorte es obligatorio.");
+      return;
+    }
     if (form.tipo_programa.toLowerCase().includes("especial") && !form.tipo_tarifa) {
       toast.error("Selecciona el tipo de tarifa.");
       return;
@@ -464,18 +468,6 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
               </SelectContent>
             </Select>
           </Field>
-          {form.tipo_programa.toLowerCase().includes("especial") && (
-            <Field label="Tipo de tarifa *">
-              <Select value={form.tipo_tarifa} onValueChange={(v) => update("tipo_tarifa", v)}>
-                <SelectTrigger><SelectValue placeholder="Selecciona una opción" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="TARIFA PARA PAGO CONTADO">TARIFA PARA PAGO CONTADO</SelectItem>
-                  <SelectItem value="TARIFA PARA PAGO EGRESADOS">TARIFA PARA PAGO EGRESADOS</SelectItem>
-                  <SelectItem value="TARIFA PARA PARTICULARES">TARIFA PARA PARTICULARES</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-          )}
           <Field label="Nombre del Programa">
             <Popover open={openProg} onOpenChange={setOpenProg}>
               <PopoverTrigger asChild>
@@ -536,12 +528,7 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
               />
             )}
           </Field>
-          {isAdmin && (
-            <Field label="SNIES">
-              <Input value={form.codigo_snies} onChange={(e) => update("codigo_snies", e.target.value)} placeholder="Ej: 108572" />
-            </Field>
-          )}
-          <Field label="Cohorte">
+          <Field label="Cohorte *">
             {cohortes.length > 0 ? (
               <Select value={form.cohorte} onValueChange={(v) => {
                 const c = cohortes.find((x) => x.codigo === v);
@@ -560,14 +547,12 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
               </Select>
             ) : (
               <Input
+                required
                 value={form.cohorte}
                 onChange={(e) => update("cohorte", e.target.value)}
-                placeholder={loadingCohortes ? "Cargando cohortes…" : "Selecciona un programa o escribe manualmente"}
+                placeholder={loadingCohortes ? "Cargando cohortes…" : "Escribe el código del cohorte"}
               />
             )}
-          </Field>
-          <Field label="Nombre del Diplomado">
-            <Input value={form.plan_estudio} onChange={(e) => update("plan_estudio", e.target.value)} />
           </Field>
           <Field label="Fecha de Inicio">
             <Input value={form.fecha_inicio} onChange={(e) => update("fecha_inicio", e.target.value)} placeholder="Ej: 24/11/2026" />
@@ -578,19 +563,23 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
           <Field label="Duración">
             <Input value={form.duracion} onChange={(e) => update("duracion", e.target.value)} placeholder="Ej: 17 semanas" />
           </Field>
-          {fieldVisible("fecha_fin") && (
-            <Field label={fieldLabel("fecha_fin", "Fecha de Finalización")}>
-              <Input value={form.fecha_fin} onChange={(e) => update("fecha_fin", e.target.value)} placeholder="Ej: Diciembre 2026" />
-            </Field>
-          )}
-          <Field label="Periodo Académico *">
-            <Input required value={form.periodo} onChange={(e) => update("periodo", e.target.value)} />
-          </Field>
         </div>
       </Section>
 
-      <Section title="Datos del recibo de pago">
+      <Section title="Valores de la Orden de Matrícula">
         <div className="grid gap-4 sm:grid-cols-2">
+          {form.tipo_programa.toLowerCase().includes("especial") && (
+            <Field label="Tipo de tarifa *">
+              <Select value={form.tipo_tarifa} onValueChange={(v) => update("tipo_tarifa", v)}>
+                <SelectTrigger><SelectValue placeholder="Selecciona una opción" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="TARIFA PARA PAGO CONTADO">TARIFA PARA PAGO CONTADO</SelectItem>
+                  <SelectItem value="TARIFA PARA PAGO EGRESADOS">TARIFA PARA PAGO EGRESADOS</SelectItem>
+                  <SelectItem value="TARIFA PARA PARTICULARES">TARIFA PARA PARTICULARES</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+          )}
           <Field label="Concepto *">
             <Select value={form.concepto_opcion} onValueChange={(v) => update("concepto_opcion", v)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
