@@ -134,7 +134,7 @@ interface Req {
 }
 
 export default function MisRecibos() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const [items, setItems] = useState<Req[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
@@ -142,6 +142,11 @@ export default function MisRecibos() {
   const [tipoFilter, setTipoFilter] = useState<"all" | DocType>("all");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [previewing, setPreviewing] = useState<Req | null>(null);
+
+  // Comercial abre la bandeja en "Pendientes" por defecto.
+  useEffect(() => {
+    if (role === "comercial") setStatusFilter("pendiente");
+  }, [role]);
 
   const load = async () => {
     if (!user) return;

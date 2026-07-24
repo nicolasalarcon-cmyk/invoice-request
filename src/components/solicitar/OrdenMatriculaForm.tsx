@@ -22,6 +22,7 @@ import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { listCohortesByNemonico, type CohorteRow } from "@/lib/sheets.functions";
 import { AttachmentsField, HistoricalAttachmentsList, type AttachmentItem } from "./AttachmentsField";
+import { AsesorCombobox } from "./AsesorCombobox";
 
 const CONCEPTOS_FIJOS = ["Matrícula", "Matrícula Parcial", "Otro"] as const;
 
@@ -414,18 +415,12 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
       {role !== "cartera" && (
         <Section title="Asignar Asesor">
           <Field label={role === "comercial" ? "Asesor Comercial *" : "Asesor Comercial"}>
-            <Select
-              value={form.asesor_nombre || "__none__"}
-              onValueChange={(v) => update("asesor_nombre", v === "__none__" ? "" : v)}
-            >
-              <SelectTrigger><SelectValue placeholder="Selecciona el asesor" /></SelectTrigger>
-              <SelectContent>
-                {role !== "comercial" && <SelectItem value="__none__">Sin asignar</SelectItem>}
-                {asesorOptions.map((a) => (
-                  <SelectItem key={a.id} value={a.nombre}>{a.nombre}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <AsesorCombobox
+              value={form.asesor_nombre}
+              onChange={(v) => update("asesor_nombre", v)}
+              options={asesorOptions}
+              allowNone={role !== "comercial"}
+            />
           </Field>
         </Section>
       )}
@@ -490,7 +485,7 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-[540px] max-w-[calc(100vw-1rem)] p-0" align="start" sideOffset={4}>
-                <Command>
+                <Command filter={(value, search) => (value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0)}>
                   <CommandInput placeholder="Buscar por nemónico o nombre…" />
                   <CommandList className="max-h-72 overflow-y-auto">
                     <CommandEmpty>

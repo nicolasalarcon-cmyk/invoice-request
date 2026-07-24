@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { formatCOP } from "@/lib/format";
 import { AttachmentsField, HistoricalAttachmentsList, type AttachmentItem } from "./AttachmentsField";
+import { AsesorCombobox } from "./AsesorCombobox";
 import { listProgramas, type Programa } from "@/lib/programas";
 import { listAsesores, type Asesor } from "@/lib/asesores";
 import { listCohortesByNemonico, type CohorteRow } from "@/lib/sheets.functions";
@@ -434,18 +435,12 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
       {role !== "cartera" && (
         <Section title="Asignar Asesor">
           <Field label={role === "comercial" ? "Asesor Comercial *" : "Asesor Comercial"}>
-            <Select
-              value={form.asesor_nombre || "__none__"}
-              onValueChange={(v) => update("asesor_nombre", v === "__none__" ? "" : v)}
-            >
-              <SelectTrigger><SelectValue placeholder="Selecciona el asesor" /></SelectTrigger>
-              <SelectContent>
-                {role !== "comercial" && <SelectItem value="__none__">Sin asignar</SelectItem>}
-                {asesorOptions.map((a) => (
-                  <SelectItem key={a.id} value={a.nombre}>{a.nombre}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <AsesorCombobox
+              value={form.asesor_nombre}
+              onChange={(v) => update("asesor_nombre", v)}
+              options={asesorOptions}
+              allowNone={role !== "comercial"}
+            />
           </Field>
         </Section>
       )}
@@ -565,8 +560,8 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
                 <Field label="Nombre Completo *">
                   <Input required maxLength={300} value={p.nombre} onChange={(e) => updateParticipant(i, "nombre", e.target.value)} />
                 </Field>
-                <Field label="Número de Identificación *">
-                  <Input required maxLength={50} type="text" inputMode="numeric" value={p.cedula} onChange={(e) => updateParticipant(i, "cedula", e.target.value.replace(/\D/g, ""))} />
+                <Field label="Número de Identificación">
+                  <Input maxLength={50} type="text" inputMode="numeric" value={p.cedula} onChange={(e) => updateParticipant(i, "cedula", e.target.value.replace(/\D/g, ""))} />
                 </Field>
               </div>
             </Section>
@@ -598,7 +593,7 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[540px] max-w-[calc(100vw-1rem)] p-0" align="start" sideOffset={4}>
-                    <Command>
+                    <Command filter={(value, search) => (value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0)}>
                       <CommandInput placeholder="Buscar por nemónico o nombre…" />
                       <CommandList className="max-h-72 overflow-y-auto">
                         <CommandEmpty>{programas.length === 0 ? "Aún no hay programas." : "Sin resultados."}</CommandEmpty>

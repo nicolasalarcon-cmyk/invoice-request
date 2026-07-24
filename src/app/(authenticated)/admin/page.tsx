@@ -224,6 +224,16 @@ export default function AdminPanel() {
   const [responseNotesText, setResponseNotesText] = useState("");
   const [responseImages, setResponseImages] = useState<{ name: string; url: string }[]>([]);
 
+  // Cartera y Financiera abren la bandeja en "Pendientes" por defecto (Mini
+  // Financiera usa su propio filtro de Gestión de Pago); Admin/Super Admin
+  // siguen viendo "Todas".
+  useEffect(() => {
+    if (!role) return;
+    if (role === "cartera" || role === "financiera") setStatusFilter("pendiente");
+    else if (role === "mini_financiera") setGestionFilter("pendiente");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role]);
+
   const load = async (silent = false) => {
     if (!silent) setLoading(true);
     const [{ data, error }, tpls] = await Promise.all([
