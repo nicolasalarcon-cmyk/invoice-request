@@ -1049,6 +1049,12 @@ export default function AdminPanel() {
                         <span className="truncate">{r.concepto ?? "Matrícula"}</span>
                         <span className="text-muted-foreground/40">•</span>
                         <span className="truncate">{r.comercial_nombre ?? "—"}</span>
+                        {r.asesor_nombre && (
+                          <>
+                            <span className="text-muted-foreground/40">•</span>
+                            <span className="truncate">Asesor: {r.asesor_nombre}</span>
+                          </>
+                        )}
                         <span className="text-muted-foreground/40">•</span>
                         <span>{formatDateTime(r.created_at)}</span>
                       </div>
