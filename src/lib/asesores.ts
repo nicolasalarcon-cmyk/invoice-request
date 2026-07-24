@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 export interface Asesor {
   id: string;
   nombre: string;
+  email: string | null;
   activo: boolean;
 }
 

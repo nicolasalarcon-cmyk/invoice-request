@@ -16,8 +16,8 @@ async function getAdminUser(request: NextRequest) {
   return user;
 }
 
-async function sendMailjet({ to, subject, html, attachment }: {
-  to: string; subject: string; html: string;
+async function sendMailjet({ to, cc, subject, html, attachment }: {
+  to: string; cc?: string; subject: string; html: string;
   attachment?: { filename: string; contentBase64: string; mimeType?: string };
 }) {
   const MAILJET_API_KEY = process.env.MAILJET_API_KEY;
@@ -33,6 +33,7 @@ async function sendMailjet({ to, subject, html, attachment }: {
   const message: Record<string, unknown> = {
     From: { Email: FROM_EMAIL, Name: FROM_NAME },
     To: [{ Email: to }],
+    ...(cc ? { Cc: [{ Email: cc }] } : {}),
     Subject: subject,
     HTMLPart: html,
   };
@@ -93,6 +94,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json() as {
     kind?: "approved" | "rejected";
     comercial_email: string;
+    asesor_email?: string;
     nombre: string;
     recibo_numero: string | null;
     pdfBase64?: string;
@@ -112,6 +114,7 @@ export async function POST(request: NextRequest) {
     });
     await sendMailjet({
       to: body.comercial_email,
+      cc: body.asesor_email,
       subject: `Solicitud rechazada — ${body.nombre}`,
       html,
     });
@@ -129,6 +132,7 @@ export async function POST(request: NextRequest) {
 
   await sendMailjet({
     to: body.comercial_email,
+    cc: body.asesor_email,
     subject: `Solicitud aprobada${body.recibo_numero ? ` N° ${body.recibo_numero}` : ""} — ${body.nombre}`,
     html,
     ...(body.pdfBase64 ? { attachment: { filename, contentBase64: body.pdfBase64, mimeType: "application/pdf" } } : {}),

@@ -19,6 +19,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { listTemplates, getTemplateDocType, type InvoiceTemplate } from "@/lib/invoice-template";
+import { listAsesores, type Asesor } from "@/lib/asesores";
 import { useLiveRefresh } from "@/lib/use-live-refresh";
 import { deleteInvoiceFiles } from "@/lib/delete-invoice-files";
 import { cn } from "@/lib/utils";
@@ -179,6 +180,7 @@ const STATUS_PILL: Record<Status, string> = {
 async function sendInvoiceEmail(data: {
   kind?: "approved" | "rejected";
   comercial_email: string;
+  asesor_email?: string;
   nombre: string;
   recibo_numero: string | null;
   pdfBase64?: string;
@@ -199,6 +201,7 @@ export default function AdminPanel() {
   const { user, role, isCartera, isMiniFinanciera, canApprove, canDelete, canViewAllRequests, canGestionarPago, loading: authLoading } = useAuth();
   const [items, setItems] = useState<Req[]>([]);
   const [templates, setTemplates] = useState<InvoiceTemplate[]>([]);
+  const [asesores, setAsesores] = useState<Asesor[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | Status>("all");
@@ -233,6 +236,9 @@ export default function AdminPanel() {
     else if (role === "mini_financiera") setGestionFilter("pendiente");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role]);
+
+  // Para copiar al correo del asesor cuando se aprueba/rechaza una solicitud de Comercial.
+  useEffect(() => { listAsesores(false).then(setAsesores).catch(() => {}); }, []);
 
   const load = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -288,6 +294,13 @@ export default function AdminPanel() {
     && r.created_by_role !== "admin"
     && r.created_by_role !== "super_admin"
     && r.created_by_role !== "financiera";
+
+  // Cuando la solicitud la creó un Comercial y tiene asesor asignado, se copia
+  // al correo de ese asesor (si lo tiene registrado en /admin/asesores).
+  const asesorEmailFor = (r: Req): string | undefined => {
+    if (r.created_by_role !== "comercial" || !r.asesor_nombre) return undefined;
+    return asesores.find((a) => a.nombre === r.asesor_nombre)?.email ?? undefined;
+  };
 
   // Base visible para el rol actual, antes de aplicar el filtro de estado —
   // sirve tanto para la lista final como para los contadores de cada chip.
@@ -532,7 +545,7 @@ export default function AdminPanel() {
       toast.success(pdfPath ? "Solicitud aprobada con PDF adjunto" : "Solicitud aprobada");
       if (shouldNotify(r)) {
         try {
-          await sendInvoiceEmail({ kind: "approved", comercial_email: r.comercial_email!, nombre: r.nombre, recibo_numero: reciboNumero, pdfBase64 });
+          await sendInvoiceEmail({ kind: "approved", comercial_email: r.comercial_email!, asesor_email: asesorEmailFor(r), nombre: r.nombre, recibo_numero: reciboNumero, pdfBase64 });
           toast.success("Notificación enviada al comercial");
         } catch (e) {
           toast.error("No se pudo enviar la notificación: " + (e instanceof Error ? e.message : ""));
@@ -600,7 +613,7 @@ export default function AdminPanel() {
           template_id: selectedTemplate || null,
         };
         const base64 = await getPdfBase64(approved);
-        await sendInvoiceEmail({ kind: "approved", comercial_email: r.comercial_email!, nombre: r.nombre, recibo_numero: reciboNumero, pdfBase64: base64 });
+        await sendInvoiceEmail({ kind: "approved", comercial_email: r.comercial_email!, asesor_email: asesorEmailFor(r), nombre: r.nombre, recibo_numero: reciboNumero, pdfBase64: base64 });
         toast.success("Notificación de aprobación enviada");
       } catch (e) {
         toast.error("No se pudo enviar la notificación: " + (e instanceof Error ? e.message : ""));
@@ -635,7 +648,7 @@ export default function AdminPanel() {
     toast.success("Solicitud rechazada — el comercial puede corregirla y reenviarla");
     if (shouldNotify(rejecting)) {
       try {
-        await sendInvoiceEmail({ kind: "rejected", comercial_email: rejecting.comercial_email!, nombre: rejecting.nombre, recibo_numero: rejecting.recibo_numero, rejection_reason: reason });
+        await sendInvoiceEmail({ kind: "rejected", comercial_email: rejecting.comercial_email!, asesor_email: asesorEmailFor(rejecting), nombre: rejecting.nombre, recibo_numero: rejecting.recibo_numero, rejection_reason: reason });
         toast.success("Notificación enviada al comercial");
       } catch (e) {
         toast.error("No se pudo enviar la notificación: " + (e instanceof Error ? e.message : ""));

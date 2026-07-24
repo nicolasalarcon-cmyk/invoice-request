@@ -913,3 +913,11 @@ ALTER TABLE invoice_requests ADD COLUMN IF NOT EXISTS tipo_tarifa text;
 -- Lugar de expedición del documento de identidad, para Persona Natural en
 -- Factura Colombia (obligatorio para el rol comercial).
 ALTER TABLE invoice_requests ADD COLUMN IF NOT EXISTS lugar_expedicion text;
+
+-- ============================================================
+-- 20260724090000_asesores_email.sql
+-- ============================================================
+
+-- Correo del asesor comercial, para copiarlo en las notificaciones de
+-- aprobación/rechazo cuando el creador de la solicitud es rol Comercial.
+ALTER TABLE asesores ADD COLUMN IF NOT EXISTS email text;

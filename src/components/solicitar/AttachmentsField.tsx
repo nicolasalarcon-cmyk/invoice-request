@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type DragEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Paperclip, X, FileText, Loader2, Lock } from "lucide-react";
@@ -11,26 +11,6 @@ export interface AttachmentItem {
   type: string;
   [key: string]: string | number;
 }
-
-const ACCEPT = [
-  ".pdf,.jpg,.jpeg,.png,.gif,.webp,.bmp",
-  ".doc,.docx,.xls,.xlsx,.ppt,.pptx",
-  ".zip,.rar,.7z,.tar,.gz,.tar.gz",
-  "application/pdf",
-  "image/*",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "application/vnd.ms-powerpoint",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  "application/zip",
-  "application/x-rar-compressed",
-  "application/vnd.rar",
-  "application/x-7z-compressed",
-  "application/x-tar",
-  "application/gzip",
-].join(",");
 
 export function AttachmentsField({
   value,
@@ -45,6 +25,7 @@ export function AttachmentsField({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [dragging, setDragging] = useState(false);
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -76,29 +57,59 @@ export function AttachmentsField({
     onChange(value.filter((_, i) => i !== idx));
   };
 
+  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (!disabled && !uploading) setDragging(true);
+  };
+
+  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragging(false);
+  };
+
+  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragging(false);
+    if (disabled || uploading) return;
+    handleFiles(e.dataTransfer.files);
+  };
+
   return (
     <div className="space-y-2">
       <input
         ref={inputRef}
         type="file"
-        accept={ACCEPT}
         multiple
         className="hidden"
         onChange={(e) => handleFiles(e.target.files)}
         disabled={disabled || uploading}
       />
-      <Button
-        type="button"
-        variant="outline"
-        onClick={() => inputRef.current?.click()}
-        disabled={disabled || uploading}
+      <div
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onClick={() => !disabled && !uploading && inputRef.current?.click()}
+        className={`flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-6 text-center transition-colors ${
+          disabled || uploading
+            ? "cursor-not-allowed border-border bg-muted/30"
+            : dragging
+              ? "cursor-pointer border-primary bg-primary/5"
+              : "cursor-pointer border-border hover:border-primary/50 hover:bg-muted/30"
+        }`}
       >
-        {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Paperclip className="mr-2 h-4 w-4" />}
-        {uploading ? "Subiendo…" : "Adjuntar archivos"}
-      </Button>
-      <p className="text-xs text-muted-foreground">
-        PDF, imágenes, Word, Excel, PowerPoint, archivos comprimidos (ZIP, RAR, 7Z). Puedes subir varios.
-      </p>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}
+          disabled={disabled || uploading}
+        >
+          {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Paperclip className="mr-2 h-4 w-4" />}
+          {uploading ? "Subiendo…" : "Adjuntar archivos"}
+        </Button>
+        <p className="text-xs text-muted-foreground">
+          {dragging ? "Suelta los archivos aquí" : "O arrastra y suelta los archivos aquí — se admite cualquier tipo de archivo. Puedes subir varios."}
+        </p>
+      </div>
       {value.length > 0 && (
         <ul className="mt-2 divide-y divide-border rounded-md border border-border bg-card">
           {value.map((f, i) => (
