@@ -286,6 +286,8 @@ export function FacturaUsaForm({ editId, duplicateFromId }: { editId?: string; d
     if (form.concepto_opcion === "Otro" && !form.concepto_otro.trim()) { toast.error("Escribe el concepto personalizado."); return; }
     if (role === "comercial" && !form.asesor_nombre) { toast.error("Selecciona el asesor comercial correspondiente."); return; }
     if (role === "cartera" && !form.numero_inscripcion.trim()) { toast.error("El número de inscripción es obligatorio."); return; }
+    if (!form.programa.trim()) { toast.error("Selecciona el programa."); return; }
+    if (!form.cohorte.trim()) { toast.error("El campo Cohorte es obligatorio."); return; }
     setBusy(true);
     try {
       const today = new Date();
@@ -629,7 +631,7 @@ export function FacturaUsaForm({ editId, duplicateFromId }: { editId?: string; d
                   />
                 )}
               </Field>
-              <Field label="Cohorte">
+              <Field label="Cohorte *">
                 {cohortes.length > 0 ? (
                   <Select value={form.cohorte} onValueChange={(v) => {
                     const c = cohortes.find((x) => x.codigo === v);

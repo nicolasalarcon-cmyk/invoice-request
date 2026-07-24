@@ -283,6 +283,8 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
     }
     if (role === "comercial" && !form.asesor_nombre) { toast.error("Selecciona el asesor comercial correspondiente."); return; }
     if (role === "cartera" && !form.numero_inscripcion.trim()) { toast.error("El número de inscripción es obligatorio."); return; }
+    if (!form.programa.trim()) { toast.error("Selecciona el programa."); return; }
+    if (!form.cohorte.trim()) { toast.error("El campo Cohorte es obligatorio."); return; }
     if (role === "comercial" && form.tipo_persona === "Persona Natural" && !form.lugar_expedicion.trim()) {
       toast.error("El lugar de expedición del documento de identidad es obligatorio.");
       return;
@@ -626,7 +628,7 @@ export function FacturaColombiaForm({ editId, duplicateFromId }: { editId?: stri
                   <Input className="mt-2" autoFocus value={form.programa} onChange={(e) => update("programa", e.target.value)} placeholder="Escribe el nombre del programa" />
                 )}
               </Field>
-              <Field label="Cohorte">
+              <Field label="Cohorte *">
                 {cohortes.length > 0 ? (
                   <Select value={form.cohorte} onValueChange={(v) => { const c = cohortes.find((x) => x.codigo === v); if (c) pickCohorte(c); }}>
                     <SelectTrigger><SelectValue placeholder={loadingCohortes ? "Cargando…" : "Selecciona cohorte"} /></SelectTrigger>

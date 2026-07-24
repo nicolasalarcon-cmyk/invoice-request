@@ -78,17 +78,47 @@ const EMPTY: FormState = {
   fecha_limite_pago: "", observaciones: "",
 };
 
-function deriveSemestre(fecha: string): string {
-  if (!fecha) return "";
-  let d: Date | null = null;
+const MESES: Record<string, number> = {
+  enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6,
+  julio: 7, agosto: 8, septiembre: 9, setiembre: 9, octubre: 10, noviembre: 11, diciembre: 12,
+};
+
+const MESES_NOMBRE = [
+  "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
+  "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE",
+];
+
+// Extrae mes/año de una fecha en cualquier formato que usemos en el
+// formulario: DD/MM/AAAA, AAAA-MM-DD, o texto libre tipo "AGOSTO 2026".
+function parseMesAnio(fecha: string): { mes: number; anio: number } | null {
+  if (!fecha) return null;
   const m1 = fecha.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   const m2 = fecha.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (m1) d = new Date(Number(m1[3]), Number(m1[2]) - 1, Number(m1[1]));
-  else if (m2) d = new Date(Number(m2[1]), Number(m2[2]) - 1, Number(m2[3]));
-  if (!d || isNaN(d.getTime())) return "";
-  const mes = d.getMonth() + 1;
-  const label = mes <= 6 ? "1er Semestre" : "2do Semestre";
-  return `${label} ${d.getFullYear()}`;
+  const m3 = fecha.match(/([a-záéíóúñ]+)\D*(\d{4})/i);
+  if (m1) return { mes: Number(m1[2]), anio: Number(m1[3]) };
+  if (m2) return { mes: Number(m2[2]), anio: Number(m2[1]) };
+  if (m3) {
+    const nombre = m3[1].toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+    const mes = MESES[nombre];
+    if (mes) return { mes, anio: Number(m3[2]) };
+  }
+  return null;
+}
+
+// Fecha de Inicio siempre se muestra/guarda normalizada como "MES AÑO"
+// (ej. "AGOSTO 2026"), sin importar en qué formato se haya escrito o de
+// dónde haya salido el dato (cohorte, convocatoria, texto libre).
+function normalizeMesAnio(fecha: string): string {
+  const parsed = parseMesAnio(fecha);
+  if (!parsed) return fecha;
+  return `${MESES_NOMBRE[parsed.mes - 1]} ${parsed.anio}`;
+}
+
+function deriveSemestre(fecha: string): string {
+  const parsed = parseMesAnio(fecha);
+  if (!parsed) return "";
+  const label = parsed.mes <= 6 ? "1er Semestre" : "2do Semestre";
+  return `${label} de ${parsed.anio}`;
 }
 
 export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: string; duplicateFromId?: string }) {
@@ -182,6 +212,14 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
     loadFormData(duplicateFromId, false);
   }, [duplicateFromId, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // El campo Periodo Académico está oculto (ver ajuste de "Datos del programa"),
+  // así que se recalcula solo a partir de Fecha de Inicio (o Convocatoria si esa
+  // falla) cada vez que cambian, para que nunca quede desactualizado.
+  useEffect(() => {
+    const derived = deriveSemestre(form.fecha_inicio) || deriveSemestre(form.convocatoria);
+    if (derived) setForm((f) => (f.periodo === derived ? f : { ...f, periodo: derived }));
+  }, [form.fecha_inicio, form.convocatoria]);
+
   const update = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
@@ -216,7 +254,7 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
     setForm((f) => ({
       ...f,
       cohorte: c.codigo,
-      fecha_inicio: c.fecha_inicio,
+      fecha_inicio: normalizeMesAnio(c.fecha_inicio),
       fecha_fin: c.fecha_finalizacion ?? f.fecha_fin,
       convocatoria: c.convocatoria,
       periodo: deriveSemestre(c.fecha_inicio) || f.periodo,
@@ -272,6 +310,10 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
       toast.error("Esta solicitud no tiene fecha de inicio ni convocatoria — por favor validar con el Super Admin la información de los programas.");
       return;
     }
+    if (!form.programa.trim()) {
+      toast.error("Selecciona el programa.");
+      return;
+    }
     if (!form.cohorte.trim()) {
       toast.error("El campo Cohorte es obligatorio.");
       return;
@@ -302,7 +344,7 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
         codigo_snies: form.codigo_snies || null,
         cohorte: form.cohorte || null,
         plan_estudio: form.plan_estudio || null,
-        fecha_inicio: form.fecha_inicio || null,
+        fecha_inicio: normalizeMesAnio(form.fecha_inicio) || null,
         fecha_fin: form.fecha_fin || null,
         horas_programa: form.horas_programa ? Number(form.horas_programa) : null,
         duracion: form.duracion || null,
@@ -468,7 +510,7 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
               </SelectContent>
             </Select>
           </Field>
-          <Field label="Nombre del Programa">
+          <Field label="Nombre del Programa *">
             <Popover open={openProg} onOpenChange={setOpenProg}>
               <PopoverTrigger asChild>
                 <Button type="button" variant="outline" role="combobox" className="w-full justify-between font-normal">
@@ -555,7 +597,12 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
             )}
           </Field>
           <Field label="Fecha de Inicio">
-            <Input value={form.fecha_inicio} onChange={(e) => update("fecha_inicio", e.target.value)} placeholder="Ej: 24/11/2026" />
+            <Input
+              value={form.fecha_inicio}
+              onChange={(e) => update("fecha_inicio", e.target.value)}
+              onBlur={(e) => update("fecha_inicio", normalizeMesAnio(e.target.value))}
+              placeholder="Ej: AGOSTO 2026"
+            />
           </Field>
           <Field label="Convocatoria">
             <Input value={form.convocatoria} onChange={(e) => update("convocatoria", e.target.value)} placeholder="Ej: NOVIEMBRE 2025" />

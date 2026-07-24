@@ -485,6 +485,14 @@ export default function AdminPanel() {
   const confirmApproveUpload = async () => {
     if (!approving) return;
     const r = approving;
+    if (!r.programa?.trim()) {
+      toast.error("Esta solicitud no tiene Programa — por favor validar con el Super Admin la información de los programas.");
+      return;
+    }
+    if (!r.cohorte) {
+      toast.error("Esta solicitud no tiene Cohorte — por favor validar con el Super Admin la información de los programas.");
+      return;
+    }
     if (!(await assertNotStale(r))) return;
     try {
       let pdfPath: string | null = null;
@@ -593,7 +601,11 @@ export default function AdminPanel() {
       toast.error("Esta solicitud no tiene fecha de inicio ni convocatoria — por favor validar con el Super Admin la información de los programas.");
       return;
     }
-    if (r.document_type === "orden_matricula" && !r.cohorte) {
+    if (!r.programa?.trim()) {
+      toast.error("Esta solicitud no tiene Programa — por favor validar con el Super Admin la información de los programas.");
+      return;
+    }
+    if (!r.cohorte) {
       toast.error("Esta solicitud no tiene Cohorte — por favor validar con el Super Admin la información de los programas.");
       return;
     }
