@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { listTemplates, getTemplateDocType, type InvoiceTemplate } from "@/lib/invoice-template";
 import { listAsesores, type Asesor } from "@/lib/asesores";
+import { FileDropzone } from "@/components/ui/file-dropzone";
 import { useLiveRefresh } from "@/lib/use-live-refresh";
 import { deleteInvoiceFiles } from "@/lib/delete-invoice-files";
 import { cn } from "@/lib/utils";
@@ -219,7 +220,7 @@ export default function AdminPanel() {
   const [rejectOtherText, setRejectOtherText] = useState("");
   const [gestionandoPago, setGestionandoPago] = useState<{ r: Req; kind: "aplicado" | "no_aplicado" } | null>(null);
   const [gestionPagoNota, setGestionPagoNota] = useState("");
-  const [gestionPagoFile, setGestionPagoFile] = useState<File | null>(null);
+  const [gestionPagoFiles, setGestionPagoFiles] = useState<File[]>([]);
   const [gestionPagoBusy, setGestionPagoBusy] = useState(false);
   const [previewing, setPreviewing] = useState<Req | null>(null);
   const [responseViewOpen, setResponseViewOpen] = useState(false);
@@ -670,14 +671,14 @@ export default function AdminPanel() {
     try {
       const user = (await supabase.auth.getUser()).data.user;
       const nextAdjuntos = [...(r.gestion_pago_adjuntos ?? [])];
-      if (gestionPagoFile) {
-        const ext = gestionPagoFile.name.includes(".") ? gestionPagoFile.name.split(".").pop() : "bin";
-        const path = `gestion-pago/${r.id}-${Date.now()}.${ext}`;
+      for (const file of gestionPagoFiles) {
+        const ext = file.name.includes(".") ? file.name.split(".").pop() : "bin";
+        const path = `gestion-pago/${r.id}-${Date.now()}-${crypto.randomUUID()}.${ext}`;
         const { error: upErr } = await supabase.storage
           .from("invoice-files")
-          .upload(path, gestionPagoFile, { contentType: gestionPagoFile.type || "application/octet-stream" });
+          .upload(path, file, { contentType: file.type || "application/octet-stream" });
         if (upErr) throw upErr;
-        nextAdjuntos.push({ path, name: gestionPagoFile.name, size: gestionPagoFile.size, type: gestionPagoFile.type });
+        nextAdjuntos.push({ path, name: file.name, size: file.size, type: file.type });
       }
       const { error } = await supabase
         .from("invoice_requests")
@@ -694,7 +695,7 @@ export default function AdminPanel() {
       toast.success(kind === "aplicado" ? "Marcado como Pago Aplicado" : "Marcado como Pago No Aplicado");
       setGestionandoPago(null);
       setGestionPagoNota("");
-      setGestionPagoFile(null);
+      setGestionPagoFiles([]);
       load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo guardar");
@@ -1115,7 +1116,12 @@ export default function AdminPanel() {
               )}
               <div className="space-y-1">
                 <label className="text-sm font-medium">Sube aquí tu factura{isPaypal ? " (opcional)" : " *"}</label>
-                <Input type="file" onChange={(e) => setApprovalPdf(e.target.files?.[0] ?? null)} />
+                <FileDropzone
+                  onFiles={(files) => setApprovalPdf(files[0] ?? null)}
+                  multiple={false}
+                  label="Subir archivo"
+                  hint="O arrastra el archivo aquí."
+                />
                 {approvalPdf && <p className="text-xs text-muted-foreground">{approvalPdf.name} · {(approvalPdf.size / 1024).toFixed(0)} KB</p>}
               </div>
               <DialogFooter>
@@ -1192,7 +1198,7 @@ export default function AdminPanel() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!gestionandoPago} onOpenChange={(o) => { if (!o) { setGestionandoPago(null); setGestionPagoNota(""); setGestionPagoFile(null); } }}>
+      <Dialog open={!!gestionandoPago} onOpenChange={(o) => { if (!o) { setGestionandoPago(null); setGestionPagoNota(""); setGestionPagoFiles([]); } }}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
@@ -1213,13 +1219,31 @@ export default function AdminPanel() {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-sm font-medium">Adjuntar soporte (opcional)</label>
-              <Input type="file" onChange={(e) => setGestionPagoFile(e.target.files?.[0] ?? null)} />
-              {gestionPagoFile && <p className="text-xs text-muted-foreground">{gestionPagoFile.name} · {(gestionPagoFile.size / 1024).toFixed(0)} KB</p>}
+              <label className="text-sm font-medium">Adjuntar soporte(s) (opcional)</label>
+              <FileDropzone
+                onFiles={(files) => setGestionPagoFiles((prev) => [...prev, ...Array.from(files)])}
+                label="Adjuntar soporte(s)"
+              />
+              {gestionPagoFiles.length > 0 && (
+                <ul className="mt-2 divide-y divide-border rounded-md border border-border bg-card">
+                  {gestionPagoFiles.map((f, i) => (
+                    <li key={`${f.name}-${i}`} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <span className="truncate">{f.name}</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">{(f.size / 1024).toFixed(0)} KB</span>
+                      </div>
+                      <Button type="button" size="sm" variant="ghost" onClick={() => setGestionPagoFiles((prev) => prev.filter((_, idx) => idx !== i))}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setGestionandoPago(null); setGestionPagoNota(""); setGestionPagoFile(null); }}>Cancelar</Button>
+            <Button variant="outline" onClick={() => { setGestionandoPago(null); setGestionPagoNota(""); setGestionPagoFiles([]); }}>Cancelar</Button>
             <Button
               className={gestionandoPago?.kind === "aplicado" ? "bg-emerald-600 hover:bg-emerald-700 text-white border-0" : "bg-rose-600 hover:bg-rose-700 text-white border-0"}
               onClick={confirmGestionPago}
