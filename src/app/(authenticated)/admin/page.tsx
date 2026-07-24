@@ -211,7 +211,7 @@ export default function AdminPanel() {
   const [dateFrom, setDateFrom] = useState<string>("");
   const [approving, setApproving] = useState<Req | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
-  const [approvalPdf, setApprovalPdf] = useState<File | null>(null);
+  const [approvalPdfs, setApprovalPdfs] = useState<File[]>([]);
   const [manualReciboNumero, setManualReciboNumero] = useState<string>("");
   const [approvalNotes, setApprovalNotes] = useState("");
   const [approvalImages, setApprovalImages] = useState<{ file: File; previewUrl: string }[]>([]);
@@ -384,7 +384,7 @@ export default function AdminPanel() {
 
   const openApprove = (r: Req) => {
     setApproving(r);
-    setApprovalPdf(null);
+    setApprovalPdfs([]);
     setApprovalNotes("");
     approvalImages.forEach((img) => URL.revokeObjectURL(img.previewUrl));
     setApprovalImages([]);
@@ -488,22 +488,39 @@ export default function AdminPanel() {
     if (!(await assertNotStale(r))) return;
     try {
       let pdfPath: string | null = null;
+      let pdfName: string | null = null;
       let pdfBase64: string | undefined;
-      if (approvalPdf) {
-        const ext = approvalPdf.name.includes(".") ? approvalPdf.name.split(".").pop() : "bin";
+      const [firstPdf, ...extraPdfs] = approvalPdfs;
+      if (firstPdf) {
+        const ext = firstPdf.name.includes(".") ? firstPdf.name.split(".").pop() : "bin";
         const path = `approved/${r.id}.${ext}`;
         const { error: upErr } = await supabase.storage
           .from("invoice-files")
-          .upload(path, approvalPdf, { contentType: approvalPdf.type || "application/octet-stream", upsert: true });
+          .upload(path, firstPdf, { contentType: firstPdf.type || "application/octet-stream", upsert: true });
         if (upErr) throw upErr;
         pdfPath = path;
+        pdfName = firstPdf.name;
         const dataUrl: string = await new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result as string);
           reader.onerror = reject;
-          reader.readAsDataURL(approvalPdf);
+          reader.readAsDataURL(firstPdf);
         });
         pdfBase64 = dataUrl.split(",")[1];
+      }
+      // Si sube más de un archivo como respuesta, el primero queda como el PDF
+      // oficial aprobado (destacado y usado para el correo); el resto se
+      // agrega como adjuntos normales de soporte, con su nombre real.
+      const extraApprovalFiles: AttachmentItem[] = [];
+      for (let i = 0; i < extraPdfs.length; i++) {
+        const file = extraPdfs[i];
+        const ext = file.name.includes(".") ? file.name.split(".").pop() : "bin";
+        const path = `approved/${r.id}-extra-${i}-${crypto.randomUUID()}.${ext}`;
+        const { error: extraErr } = await supabase.storage
+          .from("invoice-files")
+          .upload(path, file, { contentType: file.type || "application/octet-stream" });
+        if (extraErr) throw extraErr;
+        extraApprovalFiles.push({ path, name: file.name, size: file.size, type: file.type });
       }
       const uploadedNoteImages: AttachmentItem[] = [];
       for (let i = 0; i < approvalImages.length; i++) {
@@ -536,8 +553,10 @@ export default function AdminPanel() {
           approved_by: user?.id,
           approved_at: new Date().toISOString(),
           recibo_numero: reciboNumero,
-          ...(pdfPath ? { approved_pdf_path: pdfPath, approved_pdf_name: approvalPdf!.name } : {}),
-          ...(uploadedNoteImages.length > 0 ? { attachments: [...(r.attachments ?? []), ...uploadedNoteImages] as any } : {}),
+          ...(pdfPath ? { approved_pdf_path: pdfPath, approved_pdf_name: pdfName } : {}),
+          ...(uploadedNoteImages.length > 0 || extraApprovalFiles.length > 0
+            ? { attachments: [...(r.attachments ?? []), ...uploadedNoteImages, ...extraApprovalFiles] as any }
+            : {}),
           ...(notesText ? { observaciones: [r.observaciones, `📎 Nota de aprobación (PayPal): ${notesText}`].filter(Boolean).join("\n\n") } : {}),
         })
         .eq("id", r.id);
@@ -555,7 +574,7 @@ export default function AdminPanel() {
         toast.message("Esta solicitud no tiene correo de comercial registrado — no se envió notificación");
       }
       setApproving(null);
-      setApprovalPdf(null);
+      setApprovalPdfs([]);
       setManualReciboNumero("");
       setApprovalNotes("");
       approvalImages.forEach((img) => URL.revokeObjectURL(img.previewUrl));
@@ -1117,16 +1136,30 @@ export default function AdminPanel() {
               <div className="space-y-1">
                 <label className="text-sm font-medium">Sube aquí tu factura{isPaypal ? " (opcional)" : " *"}</label>
                 <FileDropzone
-                  onFiles={(files) => setApprovalPdf(files[0] ?? null)}
-                  multiple={false}
-                  label="Subir archivo"
-                  hint="O arrastra el archivo aquí."
+                  onFiles={(files) => setApprovalPdfs((prev) => [...prev, ...Array.from(files)])}
+                  label="Subir archivo(s)"
+                  hint="O arrastra los archivos aquí. El primero queda como el PDF oficial; el resto, como soporte."
                 />
-                {approvalPdf && <p className="text-xs text-muted-foreground">{approvalPdf.name} · {(approvalPdf.size / 1024).toFixed(0)} KB</p>}
+                {approvalPdfs.length > 0 && (
+                  <ul className="mt-2 divide-y divide-border rounded-md border border-border bg-card">
+                    {approvalPdfs.map((f, i) => (
+                      <li key={`${f.name}-${i}`} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          <span className="truncate">{f.name}{i === 0 ? " (PDF oficial)" : ""}</span>
+                          <span className="shrink-0 text-xs text-muted-foreground">{(f.size / 1024).toFixed(0)} KB</span>
+                        </div>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => setApprovalPdfs((prev) => prev.filter((_, idx) => idx !== i))}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setApproving(null)}>Cancelar</Button>
-                <Button onClick={confirmApproveUpload} disabled={!isPaypal && (!manualReciboNumero.trim() || !approvalPdf)}>Aprobar</Button>
+                <Button onClick={confirmApproveUpload} disabled={!isPaypal && (!manualReciboNumero.trim() || approvalPdfs.length === 0)}>Aprobar</Button>
               </DialogFooter>
             </>
             );
