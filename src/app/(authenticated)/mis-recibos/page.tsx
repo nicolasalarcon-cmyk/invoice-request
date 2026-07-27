@@ -176,8 +176,8 @@ export default function MisRecibos() {
     if (!s) return items;
     return items.filter((r) =>
       r.nombre.toLowerCase().includes(s) ||
-      r.identificacion.includes(s) ||
-      String(r.recibo_numero ?? "").includes(s) ||
+      r.identificacion.toLowerCase().includes(s) ||
+      String(r.recibo_numero ?? "").toLowerCase().includes(s) ||
       (r.comercial_nombre ?? "").toLowerCase().includes(s) ||
       (r.asesor_nombre ?? "").toLowerCase().includes(s) ||
       (r.programa ?? "").toLowerCase().includes(s) ||

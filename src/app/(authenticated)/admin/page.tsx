@@ -317,8 +317,8 @@ export default function AdminPanel() {
       if (!s) return true;
       return (
         r.nombre.toLowerCase().includes(s) ||
-        r.identificacion.includes(s) ||
-        String(r.recibo_numero ?? "").includes(s) ||
+        r.identificacion.toLowerCase().includes(s) ||
+        String(r.recibo_numero ?? "").toLowerCase().includes(s) ||
         (r.comercial_nombre ?? "").toLowerCase().includes(s) ||
         (r.comercial_email ?? "").toLowerCase().includes(s) ||
         (r.asesor_nombre ?? "").toLowerCase().includes(s) ||

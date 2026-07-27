@@ -138,7 +138,7 @@ export default function Numeracion() {
       const s = q.toLowerCase();
       list = list.filter((r) => {
         if (
-          String(r.recibo_numero ?? "").includes(s) ||
+          String(r.recibo_numero ?? "").toLowerCase().includes(s) ||
           r.nombre.toLowerCase().includes(s) ||
           r.identificacion.toLowerCase().includes(s) ||
           (r.empresa ?? "").toLowerCase().includes(s) ||
