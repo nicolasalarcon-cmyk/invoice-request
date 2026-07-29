@@ -155,6 +155,11 @@ const DOC_TYPE_LABELS: Record<string, string> = {
 // Tipos de documento donde aplica el flujo de Gestión de Pago / Mini Financiera.
 const GESTION_PAGO_DOC_TYPES = ["factura_usa", "factura_colombia", "factura_paypal"];
 
+// Tipos de documento con consecutivo propio configurado en la tabla
+// "consecutivos" de la base. Para agregar Orden de Matrícula más adelante:
+// insertar su fila en esa tabla y añadir aquí "orden_matricula".
+const CONSECUTIVO_DOC_TYPES = ["factura_usa"];
+
 const DOC_TYPE_ICONS: Record<string, LucideIcon> = {
   orden_matricula: Receipt,
   factura_usa: Globe,
@@ -612,7 +617,24 @@ export default function AdminPanel() {
     if (!(await assertNotStale(r))) return;
     const tpl = templates.find((t) => t.id === selectedTemplate);
     const user = (await supabase.auth.getUser()).data.user;
-    const reciboNumero = r.recibo_numero ?? String(Date.now() % 100000000);
+    // Al corregir se conserva el consecutivo original; solo se pide uno nuevo
+    // cuando la solicitud todavía no tiene. Los tipos de documento que ya tienen
+    // su contador configurado en la tabla "consecutivos" usan una serie propia
+    // (400, 401, 402…); el resto mantiene el número derivado de la hora del
+    // sistema, como hasta ahora, hasta que se les configure el suyo.
+    let reciboNumero = r.recibo_numero;
+    if (!reciboNumero) {
+      if (CONSECUTIVO_DOC_TYPES.includes(r.document_type ?? "")) {
+        const { data: siguiente, error: seqError } = await supabase
+          .rpc("next_consecutivo", { _document_type: r.document_type! });
+        if (seqError || !siguiente) {
+          return toast.error("No se pudo generar el consecutivo: " + (seqError?.message ?? "sin respuesta"));
+        }
+        reciboNumero = siguiente;
+      } else {
+        reciboNumero = String(Date.now() % 100000000);
+      }
+    }
     const today = new Date();
     const reciboFecha = today.toISOString().slice(0, 10);
     const limite = r.fecha_limite_pago ?? new Date(today.getTime() + (tpl?.dias_limite ?? 4) * 86400000).toISOString().slice(0, 10);

@@ -518,6 +518,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      next_consecutivo: {
+        Args: { _document_type: string }
+        Returns: string
+      }
     }
     Enums: {
       app_role: "super_admin" | "admin" | "financiera" | "cartera" | "mini_financiera" | "comercial" | "user"
