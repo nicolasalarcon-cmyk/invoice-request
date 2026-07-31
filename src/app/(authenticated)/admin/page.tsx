@@ -228,6 +228,9 @@ export default function AdminPanel() {
   const [gestionPagoFiles, setGestionPagoFiles] = useState<File[]>([]);
   const [gestionPagoBusy, setGestionPagoBusy] = useState(false);
   const [previewing, setPreviewing] = useState<Req | null>(null);
+  // Pila de navegación: al saltar a "ver la solicitud rechazada original" se
+  // guarda aquí de dónde veníamos, para poder volver exactamente ahí con un botón.
+  const [previewHistory, setPreviewHistory] = useState<Req[]>([]);
   const [responseViewOpen, setResponseViewOpen] = useState(false);
   const [responseLoading, setResponseLoading] = useState(false);
   const [responseNotesText, setResponseNotesText] = useState("");
@@ -1032,7 +1035,7 @@ export default function AdminPanel() {
               return (
                 <div
                   key={r.id}
-                  onClick={() => setPreviewing(r)}
+                  onClick={() => { setPreviewHistory([]); setPreviewing(r); }}
                   className="group relative flex cursor-pointer flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm transition-all duration-200 hover:bg-muted/40 hover:shadow-md md:flex-row md:items-center md:justify-between"
                 >
                   {/* Caja de información e identidad */}
@@ -1339,20 +1342,36 @@ export default function AdminPanel() {
             // Cartera puede editar/corregir/duplicar solo lo que ella misma creó; el resto de roles no tiene esta restricción.
             const canEditThis = !isCartera || previewing.created_by === user?.id;
             const participantes = previewing.participantes ?? [];
-            const historicalAttachments = previewing.parent_id
-              ? itemsById.get(previewing.parent_id)?.attachments ?? []
-              : [];
+            const rejectedParent = previewing.parent_id ? itemsById.get(previewing.parent_id) : undefined;
+            const historicalAttachments = rejectedParent?.attachments ?? [];
             const hasCurrentAttachments = (previewing.attachments && previewing.attachments.length > 0) || previewing.approved_pdf_path;
             const hasHistoricalAttachments = historicalAttachments.length > 0;
+            // "Relanzada": corrección de una solicitud que fue RECHAZADA (no de una
+            // ya aprobada — ese caso lo cubre isCorrectionOfApproved por separado).
+            const isRelanzadaDeRechazo = !!rejectedParent && !isCorrectionOfApproved(previewing);
             const TypeIcon = DOC_TYPE_ICONS[previewing.document_type ?? ""] ?? FileText;
             return (
               <div className="space-y-3 pb-4">
                 {/* Barra de acciones — arriba, para que se vea de una */}
                 <div className="rounded-2xl border border-border bg-card/95 px-4 py-3 shadow-sm">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button size="sm" variant="ghost" className="rounded-full" onClick={() => setPreviewing(null)}>
+                    <Button size="sm" variant="ghost" className="rounded-full" onClick={() => { setPreviewHistory([]); setPreviewing(null); }}>
                       <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Bandeja
                     </Button>
+                    {previewHistory.length > 0 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="rounded-full"
+                        onClick={() => {
+                          const anterior = previewHistory[previewHistory.length - 1];
+                          setPreviewHistory((h) => h.slice(0, -1));
+                          setPreviewing(anterior);
+                        }}
+                      >
+                        <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Volver a la corrección
+                      </Button>
+                    )}
                     {(previewing.document_type === "orden_matricula" || previewing.document_type === "factura_usa") && (
                       <Button size="sm" variant="outline" className="rounded-full" onClick={() => openPdfPreview(previewing)}>
                         <Eye className="mr-1.5 h-3.5 w-3.5" /> Ver PDF
@@ -1456,6 +1475,29 @@ export default function AdminPanel() {
                                 </button>
                               )}
                             </div>
+                            {isRelanzadaDeRechazo && rejectedParent && (
+                              <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <p className="text-xs font-bold uppercase tracking-wider text-amber-800">
+                                    🔁 Corrección de una solicitud rechazada
+                                  </p>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 rounded-full text-xs"
+                                    onClick={() => { setPreviewHistory((h) => [...h, previewing]); setPreviewing(rejectedParent); }}
+                                  >
+                                    Ver solicitud rechazada original →
+                                  </Button>
+                                </div>
+                                {rejectedParent.rejection_reason && (
+                                  <p className="text-sm text-amber-900">
+                                    <span className="font-semibold">Motivo de rechazo original:</span> {rejectedParent.rejection_reason}
+                                  </p>
+                                )}
+                              </div>
+                            )}
                             {previewing.document_type === "factura_colombia" && (
                               <DetailSection title="Recuento" noGrid>
                                 <div className="space-y-2">
@@ -1675,6 +1717,11 @@ export default function AdminPanel() {
                                       ))}
                                     </div>
                                   </div>
+                                )}
+                                {hasHistoricalAttachments && hasCurrentAttachments && (
+                                  <p className="text-xs font-medium text-muted-foreground">
+                                    Archivos nuevos de esta corrección
+                                  </p>
                                 )}
                                 <div className="grid gap-2 sm:grid-cols-2">
                                   {previewing.attachments?.map((a) => (
