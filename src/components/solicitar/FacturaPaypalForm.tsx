@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { AttachmentsField, HistoricalAttachmentsList, type AttachmentItem } from "./AttachmentsField";
 import { AsesorCombobox } from "./AsesorCombobox";
+import { notifyRequestCreated } from "@/lib/notify-request-created";
 import { listProgramas, type Programa } from "@/lib/programas";
 import { listAsesores, type Asesor } from "@/lib/asesores";
 import { listCohortesByNemonico, type CohorteRow } from "@/lib/sheets.functions";
@@ -337,7 +338,7 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
             .eq("id", editId);
           if (archErr) throw archErr;
         }
-        const { error: insErr } = await supabase.from("invoice_requests").insert({
+        const { data: inserted, error: insErr } = await supabase.from("invoice_requests").insert({
           ...payload,
           created_by: user.id,
           comercial_nombre: profile?.nombre_completo ?? null,
@@ -346,8 +347,9 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
           status: "pendiente",
           parent_id: editId,
           ...(isFixingApproved ? { recibo_numero: originalReciboNumero } : {}),
-        });
+        }).select("id").single();
         if (insErr) throw insErr;
+        if (inserted) notifyRequestCreated(inserted.id);
         if (!isFixingApproved) {
           const { error: archErr } = await supabase
             .from("invoice_requests")
@@ -361,15 +363,16 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
         if (error) throw error;
         toast.success("Solicitud actualizada");
       } else {
-        const { error } = await supabase.from("invoice_requests").insert({
+        const { data: inserted, error } = await supabase.from("invoice_requests").insert({
           ...payload,
           created_by: user.id,
           comercial_nombre: profile?.nombre_completo ?? null,
           created_by_role: role,
           comercial_email: profile?.email ?? user.email ?? null,
           status: "pendiente",
-        });
+        }).select("id").single();
         if (error) throw error;
+        if (inserted) notifyRequestCreated(inserted.id);
         toast.success("Solicitud enviada");
       }
       router.push(canViewAllRequests ? "/admin" : "/mis-recibos");

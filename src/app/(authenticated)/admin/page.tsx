@@ -1421,7 +1421,11 @@ export default function AdminPanel() {
                           <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Eliminar
                         </Button>
                       )}
-                      {canDelete && (
+                      {(canDelete || (
+                        previewing.created_by === user?.id
+                        && previewing.status === "pendiente"
+                        && !previewing.parent_id
+                      )) && (
                         <Button size="sm" variant="outline" className="rounded-full text-red-700 border-red-200 hover:bg-red-700 hover:text-white" onClick={() => removeRequest(previewing)}>
                           <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Eliminar definitivamente
                         </Button>

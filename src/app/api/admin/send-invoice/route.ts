@@ -87,23 +87,78 @@ function emailLayout({ title, intro, bodyHtml }: { title: string; intro?: string
 </body></html>`;
 }
 
-export async function POST(request: NextRequest) {
-  const adminUser = await getAdminUser(request);
-  if (!adminUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+// Roles internos: si quien creó la solicitud es uno de estos, no se notifica
+// (evita spam cuando el propio equipo prueba la plataforma).
+const INTERNAL_ROLES = ["admin", "super_admin", "financiera"];
 
+export async function POST(request: NextRequest) {
   const body = await request.json() as {
-    kind?: "approved" | "rejected";
+    kind?: "approved" | "rejected" | "created";
     comercial_email: string;
     asesor_email?: string;
     nombre: string;
     recibo_numero: string | null;
     pdfBase64?: string;
     rejection_reason?: string;
+    request_id?: string;
   };
 
-  if (!body.comercial_email) return NextResponse.json({ ok: true, skipped: "no comercial_email" });
-
   const kind = body.kind ?? "approved";
+
+  // "created": no exige rol de Financiera/Admin — cualquier usuario autenticado
+  // puede pedirlo, pero solo para SU PROPIA solicitud. El servidor vuelve a
+  // resolver correo/nombre/asesor desde la fila real (nunca confía en lo que
+  // mande el cliente), y verifica dueño con created_by antes de enviar nada.
+  if (kind === "created") {
+    const token = request.headers.get("Authorization")?.replace("Bearer ", "");
+    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    if (!body.request_id) return NextResponse.json({ error: "Falta request_id" }, { status: 400 });
+
+    const { data: reqRow, error: reqError } = await supabaseAdmin
+      .from("invoice_requests")
+      .select("created_by, created_by_role, nombre, comercial_email, asesor_nombre")
+      .eq("id", body.request_id)
+      .maybeSingle();
+    if (reqError || !reqRow) return NextResponse.json({ error: "Solicitud no encontrada" }, { status: 404 });
+    if (reqRow.created_by !== user.id) return NextResponse.json({ error: "No autorizado para esta solicitud" }, { status: 403 });
+
+    if (!reqRow.comercial_email || INTERNAL_ROLES.includes(reqRow.created_by_role ?? "")) {
+      return NextResponse.json({ ok: true, skipped: "sin correo o rol interno" });
+    }
+
+    let asesorEmail: string | undefined;
+    if (reqRow.created_by_role === "comercial" && reqRow.asesor_nombre) {
+      const { data: asesorRow } = await supabaseAdmin
+        .from("asesores")
+        .select("email")
+        .eq("nombre", reqRow.asesor_nombre)
+        .maybeSingle();
+      asesorEmail = asesorRow?.email ?? undefined;
+    }
+
+    const html = emailLayout({
+      title: "Solicitud recibida",
+      intro: `Hola, tu solicitud de <b>${reqRow.nombre}</b> fue creada y está <b>pendiente de revisión</b>.`,
+      bodyHtml: `<p style="margin:0;">Te avisaremos por este mismo medio en cuanto sea aprobada o rechazada.</p>`,
+    });
+    await sendMailjet({
+      to: reqRow.comercial_email,
+      cc: asesorEmail,
+      subject: `Solicitud recibida — ${reqRow.nombre}`,
+      html,
+    });
+    return NextResponse.json({ ok: true });
+  }
+
+  // "approved" / "rejected": estas si requieren rol de Financiera/Admin,
+  // porque solo ellos pueden aprobar o rechazar una solicitud.
+  const adminUser = await getAdminUser(request);
+  if (!adminUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  if (!body.comercial_email) return NextResponse.json({ ok: true, skipped: "no comercial_email" });
 
   if (kind === "rejected") {
     const html = emailLayout({

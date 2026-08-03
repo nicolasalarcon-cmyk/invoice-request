@@ -1076,3 +1076,21 @@ GRANT EXECUTE ON FUNCTION public.next_consecutivo(text) TO authenticated;
 -- Limpieza: elimina la versión anterior basada en secuencia, si llegó a crearse.
 DROP FUNCTION IF EXISTS public.next_factura_usa_consecutivo();
 DROP SEQUENCE IF EXISTS public.factura_usa_consecutivo;
+
+-- ============================================================
+-- 20260731090000_delete_own_pending.sql
+-- ============================================================
+
+-- Permite que el creador de una solicitud la elimine definitivamente, pero
+-- SOLO mientras sigue "pendiente" (nunca fue aprobada, rechazada ni
+-- corregida) Y no es en si misma una correccion de otra solicitud (parent_id
+-- es null). Puramente aditiva: no reemplaza "Admins can delete requests".
+CREATE POLICY "Creators can delete own pending first-time requests"
+ON public.invoice_requests
+FOR DELETE
+TO authenticated
+USING (
+  auth.uid() = created_by
+  AND status = 'pendiente'::invoice_status
+  AND parent_id IS NULL
+);

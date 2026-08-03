@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { listCohortesByNemonico, type CohorteRow } from "@/lib/sheets.functions";
 import { AttachmentsField, HistoricalAttachmentsList, type AttachmentItem } from "./AttachmentsField";
 import { AsesorCombobox } from "./AsesorCombobox";
+import { notifyRequestCreated } from "@/lib/notify-request-created";
 
 const CONCEPTOS_FIJOS = ["Matrícula", "Matrícula Parcial", "Otro"] as const;
 
@@ -394,7 +395,7 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
             .eq("id", editId);
           if (archErr) throw archErr;
         }
-        const { error: insErr } = await supabase.from("invoice_requests").insert({
+        const { data: inserted, error: insErr } = await supabase.from("invoice_requests").insert({
           ...payload,
           created_by: user.id,
           comercial_nombre: profile?.nombre_completo ?? null,
@@ -403,8 +404,9 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
           status: "pendiente",
           parent_id: editId,
           ...(isFixingApproved ? { recibo_numero: originalReciboNumero } : {}),
-        });
+        }).select("id").single();
         if (insErr) throw insErr;
+        if (inserted) notifyRequestCreated(inserted.id);
         if (!isFixingApproved) {
           const { error: archErr } = await supabase
             .from("invoice_requests")
@@ -420,7 +422,7 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
         toast.success("Solicitud actualizada");
         router.push(canViewAllRequests ? "/admin" : "/mis-recibos");
       } else {
-        const { error } = await supabase.from("invoice_requests").insert({
+        const { data: inserted, error } = await supabase.from("invoice_requests").insert({
           ...payload,
           created_by: user.id,
           comercial_nombre: profile?.nombre_completo ?? null,
@@ -431,8 +433,9 @@ export function OrdenMatriculaForm({ editId, duplicateFromId }: { editId?: strin
           approved_by: approveNow ? user.id : null,
           approved_at: approveNow ? new Date().toISOString() : null,
           recibo_numero: approveNow ? String(Date.now() % 100000000) : null,
-        });
+        }).select("id").single();
         if (error) throw error;
+        if (inserted && !approveNow) notifyRequestCreated(inserted.id);
         toast.success(approveNow ? "Recibo creado y aprobado" : "Solicitud enviada");
         router.push(canViewAllRequests ? "/admin" : "/mis-recibos");
       }

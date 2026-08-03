@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { useLiveRefresh } from "@/lib/use-live-refresh";
+import { deleteInvoiceFiles } from "@/lib/delete-invoice-files";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -75,6 +76,7 @@ interface Participante { nombre: string; cedula: string; email: string; telefono
 interface Req {
   id: string;
   status: Status;
+  parent_id: string | null;
   document_type: DocType | null;
   tipo_persona: string | null;
   lugar_expedicion: string | null;
@@ -349,6 +351,19 @@ export default function MisRecibos() {
     toast.success("Recibo eliminado");
   };
 
+  // Borrado definitivo — solo para una solicitud propia que sigue "pendiente"
+  // y nunca fue rechazada (no es una corrección de otra). Para el resto de
+  // estados se usa archiveRequest (oculta, pero conserva el historial).
+  const deleteOwnPendingRequest = async (r: Req) => {
+    if (!confirm(`¿Eliminar definitivamente la solicitud de ${r.nombre}? Esta acción no se puede deshacer y también borrará los archivos adjuntos.`)) return;
+    await deleteInvoiceFiles(r.attachments, r.approved_pdf_path);
+    const { error } = await supabase.from("invoice_requests").delete().eq("id", r.id);
+    if (error) { toast.error(error.message); return; }
+    setItems((prev) => prev.filter((x) => x.id !== r.id));
+    setPreviewing((p) => p?.id === r.id ? null : p);
+    toast.success("Solicitud eliminada definitivamente");
+  };
+
   const duplicar = (r: Req) => {
     window.location.href = `/solicitar?duplicar=${r.id}`;
   };
@@ -580,6 +595,11 @@ export default function MisRecibos() {
                       {(previewing.status === "aprobada" || previewing.status === "corregida" || previewing.status === "rechazada") && (
                         <Button size="sm" variant="outline" className="rounded-full text-red-700 border-red-200 hover:bg-red-700 hover:text-white" onClick={() => archiveRequest(previewing)}>
                           <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Eliminar
+                        </Button>
+                      )}
+                      {previewing.status === "pendiente" && !previewing.parent_id && (
+                        <Button size="sm" variant="outline" className="rounded-full text-red-700 border-red-200 hover:bg-red-700 hover:text-white" onClick={() => deleteOwnPendingRequest(previewing)}>
+                          <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Eliminar definitivamente
                         </Button>
                       )}
                     </div>
