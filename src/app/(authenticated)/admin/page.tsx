@@ -222,6 +222,9 @@ export default function AdminPanel() {
   const approveLockRef = useRef(false);
   const [approveBusy, setApproveBusy] = useState(false);
   const [resendingId, setResendingId] = useState<string | null>(null);
+  const resendLockRef = useRef(false);
+  const rejectLockRef = useRef(false);
+  const [rejectBusy, setRejectBusy] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
   const [approvalPdfs, setApprovalPdfs] = useState<File[]>([]);
   const [manualReciboNumero, setManualReciboNumero] = useState<string>("");
@@ -712,37 +715,45 @@ export default function AdminPanel() {
 
   const confirmReject = async () => {
     if (!rejecting) return;
-    if (!rejectCategory) { toast.error("Selecciona el motivo del rechazo."); return; }
-    if (rejectCategory === "Otra razón" && !rejectOtherText.trim()) {
-      toast.error("Describe el motivo específico."); return;
-    }
-    if (!(await assertNotStale(rejecting))) return;
-    const opt = REJECT_OPTIONS.find(o => o.category === rejectCategory);
-    const extra = rejectOtherText.trim();
-    const reason = rejectCategory === "Otra razón"
-      ? `Otra razón — ${extra}`
-      : `${rejectCategory} — ${opt?.description ?? ""}${extra ? ` · ${extra}` : ""}`;
-    const { error } = await supabase
-      .from("invoice_requests")
-      .update({ status: "rechazada", rejection_reason: reason })
-      .eq("id", rejecting.id);
-    if (error) return toast.error(error.message);
-    toast.success("Solicitud rechazada — el comercial puede corregirla y reenviarla");
-    if (shouldNotify(rejecting)) {
-      try {
-        await sendInvoiceEmail({ kind: "rejected", comercial_email: rejecting.comercial_email!, asesor_email: asesorEmailFor(rejecting), nombre: rejecting.nombre, recibo_numero: rejecting.recibo_numero, rejection_reason: reason });
-        toast.success("Notificación enviada al comercial");
-      } catch (e) {
-        toast.error("No se pudo enviar la notificación: " + (e instanceof Error ? e.message : ""));
+    if (rejectLockRef.current) return;
+    rejectLockRef.current = true;
+    setRejectBusy(true);
+    try {
+      if (!rejectCategory) { toast.error("Selecciona el motivo del rechazo."); return; }
+      if (rejectCategory === "Otra razón" && !rejectOtherText.trim()) {
+        toast.error("Describe el motivo específico."); return;
       }
-    } else {
-      toast.message("Esta solicitud no tiene correo de comercial registrado — no se envió notificación");
+      if (!(await assertNotStale(rejecting))) return;
+      const opt = REJECT_OPTIONS.find(o => o.category === rejectCategory);
+      const extra = rejectOtherText.trim();
+      const reason = rejectCategory === "Otra razón"
+        ? `Otra razón — ${extra}`
+        : `${rejectCategory} — ${opt?.description ?? ""}${extra ? ` · ${extra}` : ""}`;
+      const { error } = await supabase
+        .from("invoice_requests")
+        .update({ status: "rechazada", rejection_reason: reason })
+        .eq("id", rejecting.id);
+      if (error) return toast.error(error.message);
+      toast.success("Solicitud rechazada — el comercial puede corregirla y reenviarla");
+      if (shouldNotify(rejecting)) {
+        try {
+          await sendInvoiceEmail({ kind: "rejected", comercial_email: rejecting.comercial_email!, asesor_email: asesorEmailFor(rejecting), nombre: rejecting.nombre, recibo_numero: rejecting.recibo_numero, rejection_reason: reason });
+          toast.success("Notificación enviada al comercial");
+        } catch (e) {
+          toast.error("No se pudo enviar la notificación: " + (e instanceof Error ? e.message : ""));
+        }
+      } else {
+        toast.message("Esta solicitud no tiene correo de comercial registrado — no se envió notificación");
+      }
+      setRejecting(null);
+      setRejectCategory("");
+      setRejectOtherText("");
+      setPreviewing((p) => p?.id === rejecting.id ? null : p);
+      load();
+    } finally {
+      rejectLockRef.current = false;
+      setRejectBusy(false);
     }
-    setRejecting(null);
-    setRejectCategory("");
-    setRejectOtherText("");
-    setPreviewing((p) => p?.id === rejecting.id ? null : p);
-    load();
   };
 
   const confirmGestionPago = async () => {
@@ -837,10 +848,12 @@ export default function AdminPanel() {
   // o el generado desde la plantilla si no) — para cuando el comercial dice que
   // no le llegó o se perdió, sin tener que re-aprobar la solicitud.
   const resendApprovalEmail = async (r: Req) => {
+    if (resendLockRef.current) return;
     if (!shouldNotify(r)) {
       toast.message("Esta solicitud no tiene correo de comercial registrado — no se puede reenviar");
       return;
     }
+    resendLockRef.current = true;
     setResendingId(r.id);
     try {
       let pdfBase64: string | undefined;
@@ -870,6 +883,7 @@ export default function AdminPanel() {
     } catch (e) {
       toast.error("No se pudo reenviar el correo: " + (e instanceof Error ? e.message : ""));
     } finally {
+      resendLockRef.current = false;
       setResendingId(null);
     }
   };
@@ -1335,7 +1349,7 @@ export default function AdminPanel() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setRejecting(null); setRejectCategory(""); setRejectOtherText(""); }}>Cancelar</Button>
-            <Button className="bg-rose-600 hover:bg-rose-700 text-white border-0" onClick={confirmReject} disabled={!rejectCategory || (rejectCategory === "Otra razón" && !rejectOtherText.trim())}>Rechazar</Button>
+            <Button className="bg-rose-600 hover:bg-rose-700 text-white border-0" onClick={confirmReject} disabled={rejectBusy || !rejectCategory || (rejectCategory === "Otra razón" && !rejectOtherText.trim())}>{rejectBusy ? "Rechazando…" : "Rechazar"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1719,9 +1733,13 @@ export default function AdminPanel() {
                             {previewing.valor_por_estudiante != null && (
                               <PreviewRow label="Valor por estudiante" value={formatCOP(previewing.valor_por_estudiante)} />
                             )}
-                            <PreviewRow label="Recargo por mora" value={formatCOP(previewing.recargo_total)} />
+                            {previewing.valor_parcial == null && (
+                              <PreviewRow label="Recargo por mora" value={formatCOP(previewing.recargo_total)} />
+                            )}
                             <PreviewRow label="Límite de pago" value={previewing.fecha_limite_pago ?? "—"} />
-                            <PreviewRow label="Pago extraordinario" value={previewing.fecha_pago_extraordinario ?? "—"} />
+                            {previewing.valor_parcial == null && (
+                              <PreviewRow label="Pago extraordinario" value={previewing.fecha_pago_extraordinario ?? "—"} />
+                            )}
                           </DetailSection>
 
                             {previewing.pago_aplicado && GESTION_PAGO_DOC_TYPES.includes(previewing.document_type ?? "") && (

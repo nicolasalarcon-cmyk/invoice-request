@@ -141,6 +141,18 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
     const isNatural = tipoPersona === "Persona Natural";
     const conceptoRaw = data.concepto ?? "Matrícula";
     const isFijoConcepto = (CONCEPTOS_FIJOS as readonly string[]).includes(conceptoRaw);
+    // Lo que queda guardado en "valor_por_estudiante" es el valor YA CON
+    // descuento (el que se factura); pero el campo del formulario espera el
+    // valor de lista SIN descuento, del que se recalcula el total. Si se carga
+    // tal cual, al guardar se le vuelve a aplicar el descuento — por eso el
+    // valor se iba reduciendo cada vez que se corregía la solicitud. Aquí se
+    // revierte el descuento para repoblar el valor de lista original.
+    const isAbiertaLoaded = tipoPersona === "Persona Jurídica" && !((d.lista_cerrada as boolean | null) ?? true);
+    const pctLoaded = Math.min(Math.max(Number(d.descuento_pct) || 0, 0), 99.99);
+    const storedVpe = d.valor_por_estudiante != null ? Number(d.valor_por_estudiante) : null;
+    const vpeForForm = isAbiertaLoaded && storedVpe != null
+      ? Math.round(storedVpe / (1 - pctLoaded / 100))
+      : storedVpe;
     setForm({
       tipo_persona: tipoPersona,
       asesor_nombre: (d.asesor_nombre as string) ?? "",
@@ -157,7 +169,7 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
       telefono: !isNatural ? ((d.telefono as string) ?? "") : "",
       numero_participantes: d.numero_participantes != null ? String(d.numero_participantes) : "",
       lista_cerrada: (d.lista_cerrada as boolean | null) ?? true,
-      valor_por_estudiante: d.valor_por_estudiante != null ? String(d.valor_por_estudiante) : "",
+      valor_por_estudiante: vpeForForm != null ? String(vpeForForm) : "",
       descuento_pct: String(d.descuento_pct ?? 0),
       programa: data.programa ?? "",
       nemonico: (d.nemonico as string) ?? "",

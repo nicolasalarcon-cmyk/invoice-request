@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -79,6 +79,8 @@ export default function UsersPage() {
   const [users, setUsers] = useState<AppUser[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [submittingUser, setSubmittingUser] = useState(false);
+  const createLockRef = useRef(false);
   const [pwUser, setPwUser] = useState<AppUser | null>(null);
   const [form, setForm] = useState({ nombre: "", email: "", password: "", role: "comercial" as AppRoleOption });
   const [newPw, setNewPw] = useState("");
@@ -98,8 +100,11 @@ export default function UsersPage() {
   if (!isAdmin) return <main className="mx-auto max-w-md py-16 text-center"><h1 className="text-2xl font-bold">Acceso restringido</h1></main>;
 
   const handleCreate = async () => {
+    if (createLockRef.current) return;
     if (!form.email || !form.password || !form.nombre) { toast.error("Completa todos los campos"); return; }
     if (form.password.length < 6) { toast.error("La contraseña debe tener al menos 6 caracteres"); return; }
+    createLockRef.current = true;
+    setSubmittingUser(true);
     try {
       const token = await getToken();
       if (!token) throw new Error("Sin sesión");
@@ -109,6 +114,10 @@ export default function UsersPage() {
       setForm({ nombre: "", email: "", password: "", role: "comercial" });
       load();
     } catch (e) { toast.error(e instanceof Error ? e.message : "Error"); }
+    finally {
+      createLockRef.current = false;
+      setSubmittingUser(false);
+    }
   };
 
   const handlePw = async () => {
@@ -205,7 +214,7 @@ export default function UsersPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreating(false)}>Cancelar</Button>
-            <Button onClick={handleCreate}>Crear</Button>
+            <Button onClick={handleCreate} disabled={submittingUser}>{submittingUser ? "Creando…" : "Crear"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -760,9 +760,13 @@ export default function MisRecibos() {
                             {previewing.valor_por_estudiante != null && (
                               <PreviewRow label="Valor por estudiante" value={formatCOP(previewing.valor_por_estudiante)} />
                             )}
-                            <PreviewRow label="Recargo por mora" value={formatCOP(previewing.recargo_total)} />
+                            {previewing.valor_parcial == null && (
+                              <PreviewRow label="Recargo por mora" value={formatCOP(previewing.recargo_total)} />
+                            )}
                             <PreviewRow label="Límite de pago" value={previewing.fecha_limite_pago ?? "—"} />
-                            <PreviewRow label="Pago extraordinario" value={previewing.fecha_pago_extraordinario ?? "—"} />
+                            {previewing.valor_parcial == null && (
+                              <PreviewRow label="Pago extraordinario" value={previewing.fecha_pago_extraordinario ?? "—"} />
+                            )}
                           </DetailSection>
 
                             {(!hasAttachments ? (
