@@ -91,6 +91,13 @@ function emailLayout({ title, intro, bodyHtml }: { title: string; intro?: string
 // (evita spam cuando el propio equipo prueba la plataforma).
 const INTERNAL_ROLES = ["admin", "super_admin", "financiera"];
 
+// Nombre del PDF adjunto: para estos dos tipos de documento se usa un nombre
+// descriptivo; el resto conserva el genérico "Recibo-{numero}.pdf".
+const DOC_TYPE_FILENAME_LABEL: Record<string, string> = {
+  orden_matricula: "Orden de Matricula",
+  factura_usa: "Factura USA",
+};
+
 export async function POST(request: NextRequest) {
   const body = await request.json() as {
     kind?: "approved" | "rejected" | "created";
@@ -101,6 +108,7 @@ export async function POST(request: NextRequest) {
     pdfBase64?: string;
     rejection_reason?: string;
     request_id?: string;
+    document_type?: string;
   };
 
   const kind = body.kind ?? "approved";
@@ -176,7 +184,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  const filename = `Recibo-${body.recibo_numero ?? "UdeCataluña"}.pdf`;
+  const filenameLabel = DOC_TYPE_FILENAME_LABEL[body.document_type ?? ""] ?? "Recibo";
+  const filename = `${filenameLabel}-${body.recibo_numero ?? "UdeCataluña"}.pdf`;
   const html = emailLayout({
     title: "Solicitud aprobada",
     intro: `Hola, la solicitud de <b>${body.nombre}</b> fue <b>aprobada</b>.`,

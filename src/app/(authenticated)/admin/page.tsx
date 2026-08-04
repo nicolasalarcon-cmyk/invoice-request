@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ClipboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ClipboardEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import { formatCOP, formatDate, formatDateTime } from "@/lib/format";
 import {
   AlertTriangle, CheckCircle2, XCircle, FileDown, Inbox, Search, Pencil,
   FileText, Trash2, Eye, Copy, Wrench, ArrowLeft,
-  Receipt, Globe, Landmark, Wallet, Calendar, X,
+  Receipt, Globe, Landmark, Wallet, Calendar, X, Mail,
   type LucideIcon,
 } from "lucide-react";
 import { listTemplates, getTemplateDocType, type InvoiceTemplate } from "@/lib/invoice-template";
@@ -191,6 +191,7 @@ async function sendInvoiceEmail(data: {
   recibo_numero: string | null;
   pdfBase64?: string;
   rejection_reason?: string;
+  document_type?: string | null;
 }) {
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData.session?.access_token;
@@ -215,6 +216,12 @@ export default function AdminPanel() {
   const [tipoFilter, setTipoFilter] = useState<"all" | DocType>("all");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [approving, setApproving] = useState<Req | null>(null);
+  // Evita doble-clic en "Aprobar": approveLockRef bloquea de inmediato (sin
+  // esperar el re-render de React) para que un segundo clic muy rápido no
+  // alcance a colarse antes de que approveBusy desactive el botón.
+  const approveLockRef = useRef(false);
+  const [approveBusy, setApproveBusy] = useState(false);
+  const [resendingId, setResendingId] = useState<string | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
   const [approvalPdfs, setApprovalPdfs] = useState<File[]>([]);
   const [manualReciboNumero, setManualReciboNumero] = useState<string>("");
@@ -492,17 +499,20 @@ export default function AdminPanel() {
 
   const confirmApproveUpload = async () => {
     if (!approving) return;
+    if (approveLockRef.current) return;
+    approveLockRef.current = true;
+    setApproveBusy(true);
     const r = approving;
-    if (!r.programa?.trim()) {
-      toast.error("Esta solicitud no tiene Programa — por favor validar con el Super Admin la información de los programas.");
-      return;
-    }
-    if (!r.cohorte) {
-      toast.error("Esta solicitud no tiene Cohorte — por favor validar con el Super Admin la información de los programas.");
-      return;
-    }
-    if (!(await assertNotStale(r))) return;
     try {
+      if (!r.programa?.trim()) {
+        toast.error("Esta solicitud no tiene Programa — por favor validar con el Super Admin la información de los programas.");
+        return;
+      }
+      if (!r.cohorte) {
+        toast.error("Esta solicitud no tiene Cohorte — por favor validar con el Super Admin la información de los programas.");
+        return;
+      }
+      if (!(await assertNotStale(r))) return;
       let pdfPath: string | null = null;
       let pdfName: string | null = null;
       let pdfBase64: string | undefined;
@@ -581,7 +591,7 @@ export default function AdminPanel() {
       toast.success(pdfPath ? "Solicitud aprobada con PDF adjunto" : "Solicitud aprobada");
       if (shouldNotify(r)) {
         try {
-          await sendInvoiceEmail({ kind: "approved", comercial_email: r.comercial_email!, asesor_email: asesorEmailFor(r), nombre: r.nombre, recibo_numero: reciboNumero, pdfBase64 });
+          await sendInvoiceEmail({ kind: "approved", comercial_email: r.comercial_email!, asesor_email: asesorEmailFor(r), nombre: r.nombre, recibo_numero: reciboNumero, pdfBase64, document_type: r.document_type });
           toast.success("Notificación enviada al comercial");
         } catch (e) {
           toast.error("No se pudo enviar la notificación: " + (e instanceof Error ? e.message : ""));
@@ -599,94 +609,105 @@ export default function AdminPanel() {
       load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo aprobar");
+    } finally {
+      approveLockRef.current = false;
+      setApproveBusy(false);
     }
   };
 
   const confirmApprove = async () => {
     if (!approving) return;
+    if (approveLockRef.current) return;
+    approveLockRef.current = true;
+    setApproveBusy(true);
     const r = approving;
-    if (r.document_type === "orden_matricula" && !r.fecha_inicio && !r.convocatoria) {
-      toast.error("Esta solicitud no tiene fecha de inicio ni convocatoria — por favor validar con el Super Admin la información de los programas.");
-      return;
-    }
-    if (!r.programa?.trim()) {
-      toast.error("Esta solicitud no tiene Programa — por favor validar con el Super Admin la información de los programas.");
-      return;
-    }
-    if (!r.cohorte) {
-      toast.error("Esta solicitud no tiene Cohorte — por favor validar con el Super Admin la información de los programas.");
-      return;
-    }
-    if (!(await assertNotStale(r))) return;
-    const tpl = templates.find((t) => t.id === selectedTemplate);
-    const user = (await supabase.auth.getUser()).data.user;
-    // Al corregir se conserva el consecutivo original; solo se pide uno nuevo
-    // cuando la solicitud todavía no tiene. Los tipos de documento que ya tienen
-    // su contador configurado en la tabla "consecutivos" usan una serie propia
-    // (400, 401, 402…); el resto mantiene el número derivado de la hora del
-    // sistema, como hasta ahora, hasta que se les configure el suyo.
-    let reciboNumero = r.recibo_numero;
-    if (!reciboNumero) {
-      if (CONSECUTIVO_DOC_TYPES.includes(r.document_type ?? "")) {
-        const { data: siguiente, error: seqError } = await supabase
-          .rpc("next_consecutivo", { _document_type: r.document_type! });
-        if (seqError || !siguiente) {
-          return toast.error("No se pudo generar el consecutivo: " + (seqError?.message ?? "sin respuesta"));
-        }
-        reciboNumero = siguiente;
-      } else {
-        reciboNumero = String(Date.now() % 100000000);
+    try {
+      if (r.document_type === "orden_matricula" && !r.fecha_inicio && !r.convocatoria) {
+        toast.error("Esta solicitud no tiene fecha de inicio ni convocatoria — por favor validar con el Super Admin la información de los programas.");
+        return;
       }
-    }
-    const today = new Date();
-    const reciboFecha = today.toISOString().slice(0, 10);
-    const limite = r.fecha_limite_pago ?? new Date(today.getTime() + (tpl?.dias_limite ?? 4) * 86400000).toISOString().slice(0, 10);
-    const extra = new Date(new Date(limite).getTime() + (tpl?.dias_extraordinario ?? 7) * 86400000).toISOString().slice(0, 10);
+      if (!r.programa?.trim()) {
+        toast.error("Esta solicitud no tiene Programa — por favor validar con el Super Admin la información de los programas.");
+        return;
+      }
+      if (!r.cohorte) {
+        toast.error("Esta solicitud no tiene Cohorte — por favor validar con el Super Admin la información de los programas.");
+        return;
+      }
+      if (!(await assertNotStale(r))) return;
+      const tpl = templates.find((t) => t.id === selectedTemplate);
+      const user = (await supabase.auth.getUser()).data.user;
+      // Al corregir se conserva el consecutivo original; solo se pide uno nuevo
+      // cuando la solicitud todavía no tiene. Los tipos de documento que ya tienen
+      // su contador configurado en la tabla "consecutivos" usan una serie propia
+      // (400, 401, 402…); el resto mantiene el número derivado de la hora del
+      // sistema, como hasta ahora, hasta que se les configure el suyo.
+      let reciboNumero = r.recibo_numero;
+      if (!reciboNumero) {
+        if (CONSECUTIVO_DOC_TYPES.includes(r.document_type ?? "")) {
+          const { data: siguiente, error: seqError } = await supabase
+            .rpc("next_consecutivo", { _document_type: r.document_type! });
+          if (seqError || !siguiente) {
+            return toast.error("No se pudo generar el consecutivo: " + (seqError?.message ?? "sin respuesta"));
+          }
+          reciboNumero = siguiente;
+        } else {
+          reciboNumero = String(Date.now() % 100000000);
+        }
+      }
+      const today = new Date();
+      const reciboFecha = today.toISOString().slice(0, 10);
+      const limite = r.fecha_limite_pago ?? new Date(today.getTime() + (tpl?.dias_limite ?? 4) * 86400000).toISOString().slice(0, 10);
+      const extra = new Date(new Date(limite).getTime() + (tpl?.dias_extraordinario ?? 7) * 86400000).toISOString().slice(0, 10);
 
-    const notesText = approvalNotes.trim();
-    const { error } = await supabase
-      .from("invoice_requests")
-      .update({
-        status: isCorrectionOfApproved(r) ? "corregida" : "aprobada",
-        approved_by: user?.id,
-        approved_at: new Date().toISOString(),
-        recibo_numero: reciboNumero,
-        recibo_fecha: reciboFecha,
-        fecha_limite_pago: limite,
-        fecha_pago_extraordinario: extra,
-        template_id: selectedTemplate || null,
-        ...(notesText ? { observaciones: [r.observaciones, `📎 Nota de aprobación: ${notesText}`].filter(Boolean).join("\n\n") } : {}),
-      })
-      .eq("id", r.id);
-    if (error) return toast.error(error.message);
-    await purgeSupersededAttachments(r);
-    toast.success("Solicitud aprobada");
-
-    if (shouldNotify(r)) {
-      try {
-        const { getPdfBase64 } = await import("@/lib/generate-invoice-pdf");
-        const approved = {
-          ...reqToPdfData(r),
+      const notesText = approvalNotes.trim();
+      const { error } = await supabase
+        .from("invoice_requests")
+        .update({
+          status: isCorrectionOfApproved(r) ? "corregida" : "aprobada",
+          approved_by: user?.id,
+          approved_at: new Date().toISOString(),
           recibo_numero: reciboNumero,
           recibo_fecha: reciboFecha,
           fecha_limite_pago: limite,
           fecha_pago_extraordinario: extra,
           template_id: selectedTemplate || null,
-        };
-        const base64 = await getPdfBase64(approved);
-        await sendInvoiceEmail({ kind: "approved", comercial_email: r.comercial_email!, asesor_email: asesorEmailFor(r), nombre: r.nombre, recibo_numero: reciboNumero, pdfBase64: base64 });
-        toast.success("Notificación de aprobación enviada");
-      } catch (e) {
-        toast.error("No se pudo enviar la notificación: " + (e instanceof Error ? e.message : ""));
-      }
-    } else {
-      toast.message("Esta solicitud no tiene correo de comercial registrado — no se envió notificación");
-    }
+          ...(notesText ? { observaciones: [r.observaciones, `📎 Nota de aprobación: ${notesText}`].filter(Boolean).join("\n\n") } : {}),
+        })
+        .eq("id", r.id);
+      if (error) return toast.error(error.message);
+      await purgeSupersededAttachments(r);
+      toast.success("Solicitud aprobada");
 
-    setApproving(null);
-    setApprovalNotes("");
-    setPreviewing((p) => p?.id === r.id ? null : p);
-    load();
+      if (shouldNotify(r)) {
+        try {
+          const { getPdfBase64 } = await import("@/lib/generate-invoice-pdf");
+          const approved = {
+            ...reqToPdfData(r),
+            recibo_numero: reciboNumero,
+            recibo_fecha: reciboFecha,
+            fecha_limite_pago: limite,
+            fecha_pago_extraordinario: extra,
+            template_id: selectedTemplate || null,
+          };
+          const base64 = await getPdfBase64(approved);
+          await sendInvoiceEmail({ kind: "approved", comercial_email: r.comercial_email!, asesor_email: asesorEmailFor(r), nombre: r.nombre, recibo_numero: reciboNumero, pdfBase64: base64, document_type: r.document_type });
+          toast.success("Notificación de aprobación enviada");
+        } catch (e) {
+          toast.error("No se pudo enviar la notificación: " + (e instanceof Error ? e.message : ""));
+        }
+      } else {
+        toast.message("Esta solicitud no tiene correo de comercial registrado — no se envió notificación");
+      }
+
+      setApproving(null);
+      setApprovalNotes("");
+      setPreviewing((p) => p?.id === r.id ? null : p);
+      load();
+    } finally {
+      approveLockRef.current = false;
+      setApproveBusy(false);
+    }
   };
 
   const confirmReject = async () => {
@@ -810,6 +831,47 @@ export default function AdminPanel() {
     }
     const { generateInvoicePDF } = await import("@/lib/generate-invoice-pdf");
     await generateInvoicePDF(reqToPdfData(r));
+  };
+
+  // Reenvía el correo de aprobación ya enviado (mismo PDF: el subido si lo hay,
+  // o el generado desde la plantilla si no) — para cuando el comercial dice que
+  // no le llegó o se perdió, sin tener que re-aprobar la solicitud.
+  const resendApprovalEmail = async (r: Req) => {
+    if (!shouldNotify(r)) {
+      toast.message("Esta solicitud no tiene correo de comercial registrado — no se puede reenviar");
+      return;
+    }
+    setResendingId(r.id);
+    try {
+      let pdfBase64: string | undefined;
+      if (r.approved_pdf_path) {
+        const { data, error } = await supabase.storage.from("invoice-files").download(r.approved_pdf_path);
+        if (error || !data) throw error ?? new Error("No se pudo obtener el PDF");
+        pdfBase64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve((reader.result as string).split(",")[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(data);
+        });
+      } else if (!isUploadFlow(r)) {
+        const { getPdfBase64 } = await import("@/lib/generate-invoice-pdf");
+        pdfBase64 = await getPdfBase64(reqToPdfData(r));
+      }
+      await sendInvoiceEmail({
+        kind: "approved",
+        comercial_email: r.comercial_email!,
+        asesor_email: asesorEmailFor(r),
+        nombre: r.nombre,
+        recibo_numero: r.recibo_numero,
+        pdfBase64,
+        document_type: r.document_type,
+      });
+      toast.success("Correo reenviado al comercial");
+    } catch (e) {
+      toast.error("No se pudo reenviar el correo: " + (e instanceof Error ? e.message : ""));
+    } finally {
+      setResendingId(null);
+    }
   };
 
   const openResponseView = async (r: Req) => {
@@ -1206,7 +1268,7 @@ export default function AdminPanel() {
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setApproving(null)}>Cancelar</Button>
-                <Button onClick={confirmApproveUpload} disabled={!isPaypal && (!manualReciboNumero.trim() || approvalPdfs.length === 0)}>Aprobar</Button>
+                <Button onClick={confirmApproveUpload} disabled={approveBusy || (!isPaypal && (!manualReciboNumero.trim() || approvalPdfs.length === 0))}>{approveBusy ? "Aprobando…" : "Aprobar"}</Button>
               </DialogFooter>
             </>
             );
@@ -1226,7 +1288,7 @@ export default function AdminPanel() {
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setApproving(null)}>Cancelar</Button>
-                <Button onClick={confirmApprove}>Aprobar</Button>
+                <Button onClick={confirmApprove} disabled={approveBusy}>{approveBusy ? "Aprobando…" : "Aprobar"}</Button>
               </DialogFooter>
             </>
           )}
@@ -1410,6 +1472,17 @@ export default function AdminPanel() {
                     {canEditThis && (previewing.status === "aprobada" || previewing.status === "corregida") && (
                       <Button size="sm" variant="outline" className="rounded-full" onClick={() => duplicar(previewing)}>
                         <Copy className="mr-1.5 h-3.5 w-3.5" /> Duplicar
+                      </Button>
+                    )}
+                    {canApprove && (previewing.status === "aprobada" || previewing.status === "corregida") && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="rounded-full"
+                        disabled={resendingId === previewing.id}
+                        onClick={() => resendApprovalEmail(previewing)}
+                      >
+                        <Mail className="mr-1.5 h-3.5 w-3.5" /> {resendingId === previewing.id ? "Reenviando…" : "Reenviar correo"}
                       </Button>
                     )}
 
