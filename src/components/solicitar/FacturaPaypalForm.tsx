@@ -146,8 +146,10 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
     // valor de lista SIN descuento, del que se recalcula el total. Si se carga
     // tal cual, al guardar se le vuelve a aplicar el descuento — por eso el
     // valor se iba reduciendo cada vez que se corregía la solicitud. Aquí se
-    // revierte el descuento para repoblar el valor de lista original.
-    const isAbiertaLoaded = tipoPersona === "Persona Jurídica" && !((d.lista_cerrada as boolean | null) ?? true);
+    // revierte el descuento para repoblar el valor de lista original. Aplica a
+    // toda Persona Jurídica (lista abierta o cerrada), ya que ambas cobran por
+    // estudiante.
+    const isAbiertaLoaded = tipoPersona === "Persona Jurídica";
     const pctLoaded = Math.min(Math.max(Number(d.descuento_pct) || 0, 0), 99.99);
     const storedVpe = d.valor_por_estudiante != null ? Number(d.valor_por_estudiante) : null;
     const vpeForForm = isAbiertaLoaded && storedVpe != null
@@ -240,10 +242,11 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
 
   const valorNum = Number(form.valor) || 0;
 
-  // Persona Jurídica + lista abierta: cobro por participante (valor por
-  // estudiante menos descuento, multiplicado por el número de participantes).
+  // Persona Jurídica (lista abierta o cerrada): siempre se cobra por
+  // participante — valor por estudiante menos descuento, multiplicado por el
+  // número de participantes. La lista abierta/cerrada solo decide si se piden
+  // los datos individuales de cada participante, no cómo se calcula el valor.
   const numParticipantes = Math.max(0, Number(form.numero_participantes) || 0);
-  const isJuridicaAbierta = form.tipo_persona === "Persona Jurídica" && !form.lista_cerrada;
   const { valorPorEstudianteNum, valorTotalPorEstudiante, valorTotalEmpresa } = useMemo(() => {
     const vpe = Number(form.valor_por_estudiante) || 0;
     if (isCarteraPartial) return { valorPorEstudianteNum: vpe, valorTotalPorEstudiante: vpe, valorTotalEmpresa: vpe * numParticipantes };
@@ -255,10 +258,6 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
       valorTotalEmpresa: totalPorEstudiante * numParticipantes,
     };
   }, [form.valor_por_estudiante, form.descuento_pct, numParticipantes, isCarteraPartial]);
-  // Lista cerrada: valor por estudiante es solo informativo (valor total ÷ participantes).
-  const valorPorEstudianteInformativo = form.tipo_persona === "Persona Jurídica" && form.lista_cerrada && numParticipantes > 0
-    ? Math.round(valorNum / numParticipantes)
-    : 0;
 
   const isPartialActive = isMatriculaParcial && (isCarteraPartial || (usarValorParcial && Number(form.valor_parcial) > 0));
   const conceptoFinal = form.concepto_opcion === "Otro" ? (form.concepto_otro.trim() || "Otro") : form.concepto_opcion;
@@ -310,15 +309,15 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
         fecha_fin: null, horas_programa: null, duracion: null, convocatoria: null,
         periodo,
         concepto: conceptoFinal,
-        matricula: isAbierta ? valorPorEstudianteNum : valorNum,
-        descuento: isAbierta ? (valorPorEstudianteNum - valorTotalPorEstudiante) : 0,
-        descuento_pct: isAbierta ? (Number(form.descuento_pct) || 0) : 0,
-        descuento_bono: isAbierta ? (valorPorEstudianteNum - valorTotalPorEstudiante) : 0,
-        valor_total: isAbierta ? valorTotalPorEstudiante : finalTotalCerrada,
-        valor_total_empresa: isJuridica ? (isAbierta ? finalTotalAbierta : finalTotalCerrada) : null,
-        valor_por_estudiante: isJuridica ? (isAbierta ? valorTotalPorEstudiante : (valorPorEstudianteInformativo || null)) : null,
-        recargo_total: isAbierta ? finalTotalAbierta : finalTotalCerrada,
-        valor_parcial: isPartialActive ? (isCarteraPartial ? (isAbierta ? valorTotalEmpresa : valorNum) : Number(form.valor_parcial)) : null,
+        matricula: isJuridica ? valorPorEstudianteNum : valorNum,
+        descuento: isJuridica ? (valorPorEstudianteNum - valorTotalPorEstudiante) : 0,
+        descuento_pct: isJuridica ? (Number(form.descuento_pct) || 0) : 0,
+        descuento_bono: isJuridica ? (valorPorEstudianteNum - valorTotalPorEstudiante) : 0,
+        valor_total: isJuridica ? valorTotalPorEstudiante : finalTotalCerrada,
+        valor_total_empresa: isJuridica ? finalTotalAbierta : null,
+        valor_por_estudiante: isJuridica ? valorTotalPorEstudiante : null,
+        recargo_total: isJuridica ? finalTotalAbierta : finalTotalCerrada,
+        valor_parcial: isPartialActive ? (isCarteraPartial ? (isJuridica ? valorTotalEmpresa : valorNum) : Number(form.valor_parcial)) : null,
         fecha_limite_pago: form.fecha_limite_pago,
         observaciones: null,
         pago_aplicado: role === "cartera" ? form.pago_aplicado : false,
@@ -516,7 +515,7 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
                 </label>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {form.lista_cerrada
-                    ? "Solo se registra el número de participantes, sin sus datos individuales."
+                    ? "Solo se registra el número de participantes, sin sus datos individuales. El cobro sigue siendo por estudiante."
                     : "Se piden los datos de cada participante y se cobra por estudiante."}
                 </p>
               </div>
@@ -626,7 +625,7 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
                   />
                 )}
               </Field>
-              {isJuridicaAbierta ? (
+              {isJuridica ? (
                 <>
                   <Field label={isCarteraPartial ? "Valor Parcial por Estudiante *" : "Valor por Estudiante *"}>
                     <Input required type="number" min={0} value={form.valor_por_estudiante} onChange={(e) => update("valor_por_estudiante", e.target.value)} />
@@ -670,15 +669,6 @@ export function FacturaPaypalForm({ editId, duplicateFromId }: { editId?: string
                       ${valorNum.toLocaleString("es-CO", { minimumFractionDigits: 0 })}
                     </div>
                   </Field>
-
-                  {isJuridica && numParticipantes > 0 && (
-                    <Field label="Valor por Estudiante">
-                      <div className="flex h-9 items-center rounded-md border border-input bg-muted px-3 text-sm font-medium text-foreground">
-                        ${valorPorEstudianteInformativo.toLocaleString("es-CO")}
-                      </div>
-                      <p className="mt-1 text-xs text-muted-foreground">Informativo: valor total ÷ {numParticipantes} participante(s).</p>
-                    </Field>
-                  )}
 
                   <Field label="Fecha Límite de Pago *">
                     <Input required type="date" value={form.fecha_limite_pago} onChange={(e) => update("fecha_limite_pago", e.target.value)} />
