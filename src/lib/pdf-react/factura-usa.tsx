@@ -168,8 +168,13 @@ export function FacturaUSADocument({
   // subtotalUnit es el valor por estudiante (o el valor total cuando no hay
   // varios participantes); subtotal/descuento/total ya reflejan lo que paga
   // la empresa en conjunto (unitario × cantidad).
-  const subtotalUnit = Number(data.matricula) || 0;
-  const descuentoUnit = Number(data.descuento_bono) || Number(data.descuento) || 0;
+  // Con "Valor parcial a pagar" activo, ese valor YA ES lo que se factura —
+  // se muestra directo, sin el descuento "regular", para que Subtotal -
+  // Discount siempre cuadre exactamente con el TOTAL (antes salía la resta
+  // del precio de lista completo, que no coincidía con el parcial).
+  const isPartial = data.valor_parcial != null;
+  const subtotalUnit = isPartial ? (Number(data.valor_parcial) || 0) / qty : (Number(data.matricula) || 0);
+  const descuentoUnit = isPartial ? 0 : (Number(data.descuento_bono) || Number(data.descuento) || 0);
   const subtotal = subtotalUnit * qty;
   const descuento = descuentoUnit * qty;
   const total = data.valor_total_empresa != null
