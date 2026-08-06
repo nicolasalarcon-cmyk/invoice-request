@@ -586,7 +586,7 @@ export default function AdminPanel() {
           ...(uploadedNoteImages.length > 0 || extraApprovalFiles.length > 0
             ? { attachments: [...(r.attachments ?? []), ...uploadedNoteImages, ...extraApprovalFiles] as any }
             : {}),
-          ...(notesText ? { observaciones: [r.observaciones, `📎 Nota de aprobación (PayPal): ${notesText}`].filter(Boolean).join("\n\n") } : {}),
+          ...(notesText ? { observaciones: [r.observaciones, `📎 Nota de aprobación: ${notesText}`].filter(Boolean).join("\n\n") } : {}),
         })
         .eq("id", r.id);
       if (error) throw error;
@@ -1189,6 +1189,7 @@ export default function AdminPanel() {
           </DialogHeader>
           {isUploadFlow(approving) ? (() => {
             const isPaypal = approving?.document_type === "factura_paypal";
+            const isColombia = approving?.document_type === "factura_colombia";
             return (
             <>
               <p className="text-sm text-muted-foreground">
@@ -1224,15 +1225,17 @@ export default function AdminPanel() {
                     : "Quedará registrado en la sección Numeración."}
                 </p>
               </div>
-              {isPaypal && (
+              {(isPaypal || isColombia) && (
                 <div className="space-y-1">
-                  <label className="text-sm font-medium">Nota de aprobación</label>
+                  <label className="text-sm font-medium">Nota de aprobación (opcional)</label>
                   <p className="text-xs text-muted-foreground">
-                    Escribe el detalle de la transacción y pega aquí capturas de pantalla (Ctrl+V) si las tienes. Opcional.
+                    {isPaypal
+                      ? "Escribe el detalle de la transacción y pega aquí capturas de pantalla (Ctrl+V) si las tienes."
+                      : "Agrega cualquier detalle relevante sobre esta aprobación. Puedes pegar capturas de pantalla (Ctrl+V) si las tienes."}
                   </p>
                   <textarea
                     className="min-h-[90px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    placeholder="Ej: Pago confirmado en PayPal, ID de transacción 8LK..., pega aquí la captura de la transacción"
+                    placeholder={isPaypal ? "Ej: Pago confirmado en PayPal, ID de transacción 8LK..., pega aquí la captura de la transacción" : "Ej: Factura verificada con el proveedor, sin novedades..."}
                     value={approvalNotes}
                     onChange={(e) => setApprovalNotes(e.target.value)}
                     onPaste={handleNotesPaste}
